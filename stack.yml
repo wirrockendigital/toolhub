@@ -1,0 +1,27 @@
+version: "3.9"
+
+services:
+  toolhub:
+    build: .
+    image: toolhub:latest
+    container_name: toolhub
+    hostname: toolhub
+    restart: always
+    stdin_open: true
+    tty: true
+    expose:
+      - "5656"
+    user: "1061:100"
+    volumes:
+      - /volume1/docker/toolhub:/workspace
+      - /volume1/docker/shared:/shared
+      - /volume1/docker/toolhub/scripts:/scripts
+      - /volume1/docker/toolhub/cron.d:/etc/cron.d
+      - /volume1/docker/toolhub/logs:/logs
+    networks:
+      alle-meine-docker-net:
+        ipv4_address: 192.168.131.100
+
+networks:
+  alle-meine-docker-net:
+    external: true
