@@ -1,8 +1,8 @@
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 
-# Täglicher Audio-Split um 03:00 Uhr
-0 3 * * * toolhubuser cd /workdir && \
+# Daily audio-split at 03:00
+0 3 * * * toolhubuser cd /shared && \
   for f in audio/in/*.m4a; do \
     [ -f "$f" ] && job=$(basename "$f" .m4a) && \
     /scripts/split-audio.sh "$f" "audio/out/$job"; \

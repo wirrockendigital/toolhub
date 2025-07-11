@@ -1,0 +1,37 @@
+# Bytecode und Cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Logs
+logs/
+*.log
+
+# Virtuelle Umgebungen
+.venv/
+.venv*/
+env/
+env*/
+
+# Systemdateien
+.DS_Store
+Thumbs.db
+
+# Docker temporäre Dateien
+*.pid
+*.sock
+
+# Archivdateien
+*.zip
+*.tar
+*.tar.gz
+*.tar.bz2
+
+# Editor-spezifisch
+.vscode/
+.idea/
+*.swp
+
+# Mount-Verzeichnisse
+/shared/
+workspace/

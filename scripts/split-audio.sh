@@ -6,7 +6,7 @@
 INPUT_FILE="$1"
 OUTPUT_DIR="$2"
 
-# Shared-Verzeichnis standardmäßig verwenden, wenn keine absoluten Pfade
+# Use shared directory by default if no absolute paths are provided
 SHARED_DIR="/shared"
 if [[ "$INPUT_FILE" != /* ]]; then
   INPUT_FILE="$SHARED_DIR/$INPUT_FILE"
@@ -18,7 +18,7 @@ fi
 # Ensure audio subdirectories exist
 mkdir -p "$SHARED_DIR/audio/in" "$SHARED_DIR/audio/out"
 
-# Temporäre Datei für Stille-Erkennung
+# Temporary file for silence detection
 TMP_SILENCE=$(mktemp)
 
 # Check input
@@ -31,7 +31,7 @@ mkdir -p "$OUTPUT_DIR"
 
 # Step 1: Detect silence
 echo "Detecting silence..." 
-ffmpeg -i "$INPUT_FILE" -af silencedetect=noise=-30dB:d=1 -f null - 2> "$TMP_SILENCE"
+ffmpeg -i "$INPUT_FILE" -af silencedetect=noise=-30dB:d=1 -f null - 2> "$TMP_SILENCE" || { echo "Error: silence detection failed"; exit 1; }
 
 # Step 2: Parse silence log to find optimal split points near 10min intervals
 SPLIT_POINTS=()
@@ -60,7 +60,7 @@ for END in "${SPLIT_POINTS[@]}"; do
   OUTFILE=$(printf "%s/part_%02d.m4a" "$OUTPUT_DIR" "$INDEX")
   DURATION_PART=$(echo "$END - $START" | bc)
   echo "Exporting $OUTFILE (start=$START, duration=$DURATION_PART)"
-  ffmpeg -y -i "$INPUT_FILE" -ss "$START" -t "$DURATION_PART" -c copy "$OUTFILE"
+  ffmpeg -y -i "$INPUT_FILE" -ss "$START" -t "$DURATION_PART" -c copy "$OUTFILE" || { echo "Error: splitting failed for $OUTFILE"; exit 1; }
   START="$END"
   INDEX=$((INDEX + 1))
 done

@@ -31,6 +31,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt /tmp/requirements.txt
 RUN pip3 install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.txt
 
+COPY scripts /bootstrap/scripts
+COPY cron.d /bootstrap/cron.d
+COPY logs /bootstrap/logs
+
 ENV PATH="/scripts:$PATH"
 
 # Benutzer anlegen
