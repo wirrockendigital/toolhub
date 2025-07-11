@@ -33,6 +33,7 @@
    - `/volume1/docker/toolhub/scripts` (mounted as `/scripts`)  
    - `/volume1/docker/toolhub/cron.d` (mounted as `/etc/cron.d`)  
    - `/volume1/docker/toolhub/logs` (mounted as `/logs`)
+   - In your `docker-compose.yml`, configure the user with `user: "<UID>:<GID>"` (e.g., `user: "1061:100"`) to match the host directory permissions.
 
 ---
 

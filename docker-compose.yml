@@ -2,8 +2,7 @@ version: "3.9"
 
 services:
   toolhub:
-    build: .
-    image: toolhub:latest
+    image: ghcr.io/wirrockendigital/toolhub:latest
     container_name: toolhub
     hostname: toolhub
     restart: always

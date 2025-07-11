@@ -55,7 +55,6 @@ RUN printf '%s\n' \
   > /start.sh \
   && chmod +x /start.sh
 
-USER 1061:100
 WORKDIR /workspace
 EXPOSE 22 5656
 CMD ["/start.sh"]
