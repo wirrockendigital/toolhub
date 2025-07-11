@@ -4,7 +4,14 @@ exec > /logs/start.log 2>&1
 
 echo "[INIT] Checking if initial directories need setup..."
 
+
 BOOTSTRAP_SRC="/bootstrap"
+
+# Kopiere start.sh ins Workspace, wenn dort noch nicht vorhanden
+if [ ! -f /workspace/start.sh ]; then
+  echo "[INIT] Copying start.sh into /workspace..."
+  cp "$BOOTSTRAP_SRC/start.sh" /workspace/start.sh
+fi
 
 # Zielverzeichnisse auf dem Host (werden vom Volume überlagert)
 for dir in /workspace/scripts /workspace/cron.d /workspace/logs; do

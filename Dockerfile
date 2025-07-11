@@ -31,9 +31,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt /tmp/requirements.txt
 RUN pip3 install --no-cache-dir --break-system-packages -r /tmp/requirements.txt && rm /tmp/requirements.txt
 
-COPY scripts /bootstrap/scripts
-COPY cron.d /bootstrap/cron.d
-COPY logs /bootstrap/logs
+COPY scripts /bootstrap/scripts/
+COPY cron.d /bootstrap/cron.d/
+COPY logs /bootstrap/logs/
+COPY start.sh /start.sh
+RUN chmod +x /start.sh /bootstrap/scripts/*.sh
 
 ENV PATH="/scripts:$PATH"
 
