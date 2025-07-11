@@ -48,15 +48,6 @@ RUN mkdir /var/run/sshd \
   && echo "PermitRootLogin no" >> /etc/ssh/sshd_config \
   && echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config
 
-# Start-Script für SSH, Cron und Webhook
-RUN printf '%s\n' \
-  '#!/bin/bash' \
-  '/usr/sbin/sshd &' \
-  'cron &' \
-  'exec python3 /scripts/webhook.py' \
-  > /start.sh \
-  && chmod +x /start.sh
-
 WORKDIR /workspace
 EXPOSE 22 5656
 CMD ["/start.sh"]

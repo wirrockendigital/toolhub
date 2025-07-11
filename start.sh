@@ -8,35 +8,27 @@ echo "[INIT] Checking if initial directories need setup..."
 BOOTSTRAP_SRC="/bootstrap"
 
 # Kopiere start.sh ins Workspace, wenn dort noch nicht vorhanden
-if [ ! -f /workspace/start.sh ]; then
-  echo "[INIT] Copying start.sh into /workspace..."
-  cp "$BOOTSTRAP_SRC/start.sh" /workspace/start.sh
+if [ ! -f /scripts/start.sh ]; then
+  echo "[INIT] Copying start.sh into /scripts..."
+  cp "$BOOTSTRAP_SRC/start.sh" /scripts/start.sh
 fi
 
 # Zielverzeichnisse auf dem Host (werden vom Volume überlagert)
-for dir in /workspace/scripts /workspace/cron.d /workspace/logs; do
+for dir in /scripts /etc/cron.d /logs; do
   if [ ! -d "$dir" ]; then
     echo "[INIT] Creating missing directory: $dir"
     mkdir -p "$dir"
   fi
 done
 
-# Kopiere nur, wenn leer
-if [ -z "$(ls -A /workspace/scripts 2>/dev/null)" ]; then
-  echo "[INIT] Populating scripts..."
-  cp -r "$BOOTSTRAP_SRC/scripts/"* /workspace/scripts/
-fi
+echo "[INIT] Populating scripts (overwrite)..."
+cp -r "$BOOTSTRAP_SRC/scripts/"* /scripts/
 
-if [ -z "$(ls -A /workspace/cron.d 2>/dev/null)" ]; then
-  echo "[INIT] Populating cron.d..."
-  cp -r "$BOOTSTRAP_SRC/cron.d/"* /workspace/cron.d/
-fi
+echo "[INIT] Populating cron.d (overwrite)..."
+cp -r "$BOOTSTRAP_SRC/cron.d/"* /etc/cron.d/
 
-# logs Ordner befüllen, wenn leer
-if [ -z "$(ls -A /workspace/logs 2>/dev/null)" ]; then
-  echo "[INIT] Populating logs..."
-  cp -r "$BOOTSTRAP_SRC/logs/"* /workspace/logs/
-fi
+echo "[INIT] Populating logs (overwrite)..."
+cp -r "$BOOTSTRAP_SRC/logs/"* /logs/
 
 # Startet SSH, Cron und den Flask-Webserver
 
