@@ -5,6 +5,7 @@
 
 
 # Toolhub
+**Version:** 0.1 (2025-07-11)
 
 **Toolhub** is a universal sidecar Docker container that offers a collection of useful command-line tools, SSH access, HTTP webhooks, and cron jobs. You can invoke installed tools via SSH, predefined scripts, or a flexible webhook API—ideal for automations in n8n, scheduled tasks, and manual interventions.
 
