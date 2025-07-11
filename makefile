@@ -8,7 +8,7 @@ PLATFORM=linux/amd64
 .PHONY: build tag push run clean
 
 build:
-	docker build --platform=$(PLATFORM) -t $(IMAGE_NAME):$(IMAGE_TAG) .
+	docker buildx build --platform=$(PLATFORM) -t $(IMAGE_NAME):$(IMAGE_TAG) --load .
 
 tag:
 	docker tag $(IMAGE_NAME):$(IMAGE_TAG) $(GHCR_REPO):$(IMAGE_TAG)
