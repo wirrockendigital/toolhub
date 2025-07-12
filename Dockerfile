@@ -28,15 +28,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   openssh-server \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Python-Abhängigkeiten
 COPY requirements.txt /tmp/requirements.txt
 RUN pip3 install --no-cache-dir --break-system-packages -r /tmp/requirements.txt && rm /tmp/requirements.txt
 
-COPY --chown=toolhubuser:toolhubuser --chmod=755 scripts /bootstrap/scripts/
-COPY --chown=toolhubuser:toolhubuser --chmod=755 cron.d /bootstrap/cron.d/
-COPY --chown=toolhubuser:toolhubuser --chmod=755 logs /bootstrap/logs/
+# Bootstrap-Dateien kopieren mit korrekten Rechten
+COPY --chown=toolhubuser:toolhubuser --chmod=755 scripts/ /bootstrap/scripts/
+COPY --chown=toolhubuser:toolhubuser --chmod=755 cron.d/ /bootstrap/cron.d/
+COPY --chown=toolhubuser:toolhubuser --chmod=755 logs/ /bootstrap/logs/
 COPY --chown=toolhubuser:toolhubuser --chmod=755 start.sh /start.sh
-RUN sed -i 's/\r$$//' /start.sh
-RUN sed -i 's/\r$$//' /bootstrap/scripts/*.sh
+
+# Zeilenumbrüche entfernen aus Shell- und Python-Dateien
+RUN sed -i 's/\r$//' /start.sh && \
+    find /bootstrap/scripts -type f \( -name "*.sh" -o -name "*.py" \) -exec sed -i 's/\r$//' {} \;
+
+# Bootstrap-Verzeichnis vollständig lesbar machen (Sicherheit vs. Komfort)
+RUN chmod -R 755 /bootstrap
 
 ENV PATH="/scripts:$PATH"
 
