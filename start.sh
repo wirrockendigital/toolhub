@@ -1,21 +1,24 @@
+
 #!/bin/bash
-# Dynamically set TOOLHUB_UID and TOOLHUB_GID from environment or defaults
+# Dynamically set user parameters from environment or defaults
+: "${TOOLHUB_USER:=toolhubuser}"
+: "${TOOLHUB_PASSWORD:=toolhub123}"
 : "${TOOLHUB_UID:=1061}"
 : "${TOOLHUB_GID:=100}"
 
 # Ensure group exists or update its GID
-if getent group toolhubuser >/dev/null 2>&1; then
-  groupmod -g "$TOOLHUB_GID" toolhubuser
+if getent group "$TOOLHUB_USER" >/dev/null 2>&1; then
+  groupmod -g "$TOOLHUB_GID" "$TOOLHUB_USER"
 else
-  groupadd -g "$TOOLHUB_GID" toolhubuser
+  groupadd -g "$TOOLHUB_GID" "$TOOLHUB_USER"
 fi
 
 # Ensure user exists or update its UID and primary group
-if id -u toolhubuser >/dev/null 2>&1; then
-  usermod -u "$TOOLHUB_UID" -g "$TOOLHUB_GID" toolhubuser
+if id -u "$TOOLHUB_USER" >/dev/null 2>&1; then
+  usermod -u "$TOOLHUB_UID" -g "$TOOLHUB_USER" "$TOOLHUB_USER"
 else
-  useradd -m -u "$TOOLHUB_UID" -g "$TOOLHUB_GID" -s /bin/bash toolhubuser
-  echo "toolhubuser:changeme" | chpasswd
+  useradd -m -u "$TOOLHUB_UID" -g "$TOOLHUB_USER" -s /bin/bash "$TOOLHUB_USER"
+  echo "$TOOLHUB_USER:$TOOLHUB_PASSWORD" | chpasswd
 fi
 
 echo "[INIT] Starting bootstrap..."
@@ -25,7 +28,7 @@ BOOTSTRAP_SRC="/bootstrap"
 for dir in /scripts /etc/cron.d /logs /var/run/cron; do
   echo "[INIT] Creating or fixing directory: $dir"
   mkdir -p "$dir"
-  chown toolhubuser:toolhubuser "$dir"
+  chown "$TOOLHUB_USER:$TOOLHUB_USER" "$dir"
 done
 
 # Ensure shared audio directory structure exists
@@ -33,7 +36,7 @@ echo "[INIT] Creating shared audio directories..."
 SHARED_DIR="/shared"
 for d in "$SHARED_DIR" "$SHARED_DIR/audio" "$SHARED_DIR/audio/in" "$SHARED_DIR/audio/out"; do
   mkdir -p "$d"
-  chown toolhubuser:toolhubuser "$d"
+  chown "$TOOLHUB_USER:$TOOLHUB_USER" "$d"
 done
 
 # Populate scripts (overwrite)
@@ -55,5 +58,5 @@ echo "[INIT] Starting cron daemon..."
 cron &
 
 # Launch webhook service with Gunicorn as toolhubuser
-echo "[INIT] Launching webhook service with Gunicorn as toolhubuser..."
-exec su - toolhubuser -c "cd /scripts && gunicorn --bind 0.0.0.0:5656 webhook:app"
+echo "[INIT] Launching webhook service with Gunicorn as $TOOLHUB_USER..."
+exec su - "$TOOLHUB_USER" -c "cd /scripts && gunicorn --bind 0.0.0.0:5656 webhook:app"
