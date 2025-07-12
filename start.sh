@@ -34,17 +34,17 @@ for d in "$SHARED_DIR" "$SHARED_DIR/audio" "$SHARED_DIR/audio/in" "$SHARED_DIR/a
   chown "$TOOLHUB_USER:$GROUP_NAME" "$d"
 done
 
-# Populate scripts (overwrite)
-echo "[INIT] Populating scripts..."
-cp -r "$BOOTSTRAP_SRC/scripts/." /scripts/
-
-# Populate cron jobs (overwrite)
-echo "[INIT] Populating cron.d..."
-cp -r "$BOOTSTRAP_SRC/cron.d/." /etc/cron.d/
-
-# Populate logs (overwrite)
-echo "[INIT] Populating logs..."
-cp -r "$BOOTSTRAP_SRC/logs/." /logs/
+ # Populate scripts (conditional overwrite)
+if [[ "$TOOLHUB_FORCE_UPDATE" == "1" ]]; then
+  echo "[INIT] Overwriting scripts (TOOLHUB_FORCE_UPDATE=1)..."
+  cp -r "$BOOTSTRAP_SRC/scripts/." /scripts/
+  echo "[INIT] Overwriting cron.d (TOOLHUB_FORCE_UPDATE=1)..."
+  cp -r "$BOOTSTRAP_SRC/cron.d/." /etc/cron.d/
+  echo "[INIT] Overwriting logs (TOOLHUB_FORCE_UPDATE=1)..."
+  cp -r "$BOOTSTRAP_SRC/logs/." /logs/
+else
+  echo "[INIT] Skipping script/cron/log overwrite (TOOLHUB_FORCE_UPDATE not set)"
+fi
 
 echo "[INIT] Starting SSH daemon..."
 /usr/sbin/sshd &

@@ -36,10 +36,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3-gunicor
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Bootstrap-Dateien kopieren mit korrekten Rechten
-COPY --chown=toolhubuser:toolhubuser --chmod=755 scripts/ /bootstrap/scripts/
-COPY --chown=toolhubuser:toolhubuser --chmod=755 cron.d/ /bootstrap/cron.d/
-COPY --chown=toolhubuser:toolhubuser --chmod=755 logs/ /bootstrap/logs/
-COPY --chown=toolhubuser:toolhubuser --chmod=755 start.sh /start.sh
+COPY --chown=toolhubuser:user --chmod=755 scripts/ /bootstrap/scripts/
+COPY --chown=toolhubuser:user --chmod=755 cron.d/ /bootstrap/cron.d/
+COPY --chown=toolhubuser:user --chmod=755 logs/ /bootstrap/logs/
+COPY --chown=toolhubuser:user --chmod=755 start.sh /start.sh
 
 # Zeilenumbrüche entfernen aus Shell- und Python-Dateien
 RUN sed -i 's/\r$//' /start.sh && \
