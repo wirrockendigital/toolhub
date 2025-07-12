@@ -17,7 +17,7 @@ services:
     user: "1061:100"
     volumes:
       - /volume1/docker/toolhub:/workspace
-      - /volume1/docker/shared:/shared
+      - /volume1/docker/toolhub/shared:/shared
       - /volume1/docker/toolhub/scripts:/scripts
       - /volume1/docker/toolhub/cron.d:/etc/cron.d
       - /volume1/docker/toolhub/logs:/logs

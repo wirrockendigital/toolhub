@@ -31,6 +31,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Python-Abhängigkeiten
 COPY requirements.txt /tmp/requirements.txt
 RUN pip3 install --no-cache-dir --break-system-packages -r /tmp/requirements.txt && rm /tmp/requirements.txt
+# Install Gunicorn for production WSGI server
+RUN pip3 install --no-cache-dir gunicorn
 
 # Bootstrap-Dateien kopieren mit korrekten Rechten
 COPY --chown=toolhubuser:toolhubuser --chmod=755 scripts/ /bootstrap/scripts/
@@ -56,7 +58,12 @@ RUN mkdir /var/run/sshd \
   && echo "PermitRootLogin no" >> /etc/ssh/sshd_config \
   && echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config
 
+# Generate SSH host keys at build time
+RUN ssh-keygen -A
+
+# Prepare cron run directory for PID file
+RUN mkdir -p /var/run/cron && chown toolhubuser:toolhubuser /var/run/cron
+
 WORKDIR /workspace
 EXPOSE 22 5656
-USER toolhubuser
 CMD ["bash", "/start.sh"]
