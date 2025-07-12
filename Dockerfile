@@ -35,7 +35,9 @@ COPY scripts /bootstrap/scripts/
 COPY cron.d /bootstrap/cron.d/
 COPY logs /bootstrap/logs/
 COPY start.sh /start.sh
-RUN chmod +x /start.sh /bootstrap/scripts/*.sh
+RUN sed -i 's/\r$$//' /start.sh
+RUN sed -i 's/\r$$//' /bootstrap/scripts/*.sh
+RUN chmod 755 /start.sh /bootstrap/scripts/*.sh
 
 ENV PATH="/scripts:$PATH"
 
@@ -50,4 +52,4 @@ RUN mkdir /var/run/sshd \
 
 WORKDIR /workspace
 EXPOSE 22 5656
-CMD ["/start.sh"]
+CMD ["bash", "/start.sh"]
