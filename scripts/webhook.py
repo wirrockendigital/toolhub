@@ -28,7 +28,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 app = Flask(__name__)
+
+
+# --- TEST ENDPOINT ---
+@app.route("/test", methods=["POST"])
+def test():
+    """Simple test endpoint to verify server is running."""
+    data = request.get_json(force=True)
+    return jsonify({"response": "pong", "echo": data})
+
 
 # Max JSON-Payload auf 1 GB begrenzen
 app.config['MAX_CONTENT_LENGTH'] = MAX_PAYLOAD_SIZE
