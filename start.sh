@@ -5,15 +5,14 @@
 : "${TOOLHUB_PASSWORD:=toolhub123}"
 : "${TOOLHUB_UID:=1061}"
 : "${TOOLHUB_GID:=100}"
+GROUP_NAME="users"
 
-# Create group if it doesn't exist
-if ! getent group "$TOOLHUB_GID" >/dev/null; then
-  groupadd -g "$TOOLHUB_GID" "$TOOLHUB_USER"
-fi
+# Use system group 'users', assume it exists (Debian default)
+GROUP_NAME="users"
 
 # Create user if it doesn't exist
 if ! id -u "$TOOLHUB_USER" >/dev/null 2>&1; then
-  useradd -m -u "$TOOLHUB_UID" -g "$TOOLHUB_GID" -s /bin/bash "$TOOLHUB_USER"
+  useradd -m -u "$TOOLHUB_UID" -g "$GROUP_NAME" -s /bin/bash "$TOOLHUB_USER"
   echo "$TOOLHUB_USER:$TOOLHUB_PASSWORD" | chpasswd
 fi
 
@@ -24,7 +23,7 @@ BOOTSTRAP_SRC="/bootstrap"
 for dir in /scripts /etc/cron.d /logs /var/run/cron; do
   echo "[INIT] Creating or fixing directory: $dir"
   mkdir -p "$dir"
-  chown "$TOOLHUB_USER:$TOOLHUB_USER" "$dir"
+  chown "$TOOLHUB_USER:$GROUP_NAME" "$dir"
 done
 
 # Ensure shared audio directory structure exists
@@ -32,7 +31,7 @@ echo "[INIT] Creating shared audio directories..."
 SHARED_DIR="/shared"
 for d in "$SHARED_DIR" "$SHARED_DIR/audio" "$SHARED_DIR/audio/in" "$SHARED_DIR/audio/out"; do
   mkdir -p "$d"
-  chown "$TOOLHUB_USER:$TOOLHUB_USER" "$d"
+  chown "$TOOLHUB_USER:$GROUP_NAME" "$d"
 done
 
 # Populate scripts (overwrite)
