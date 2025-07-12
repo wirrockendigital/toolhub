@@ -14,7 +14,8 @@ services:
     ports:
       - "2222:22"
       - "5656:5656"
-    user: "1061:100"
+    env_file:
+      - /volume1/docker/toolhub/.env
     volumes:
       - /volume1/docker/toolhub:/workspace
       - /volume1/docker/toolhub/shared:/shared
