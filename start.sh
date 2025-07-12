@@ -28,6 +28,14 @@ for dir in /scripts /etc/cron.d /logs /var/run/cron; do
   chown toolhubuser:toolhubuser "$dir"
 done
 
+# Ensure shared audio directory structure exists
+echo "[INIT] Creating shared audio directories..."
+SHARED_DIR="/shared"
+for d in "$SHARED_DIR" "$SHARED_DIR/audio" "$SHARED_DIR/audio/in" "$SHARED_DIR/audio/out"; do
+  mkdir -p "$d"
+  chown toolhubuser:toolhubuser "$d"
+done
+
 # Populate scripts (overwrite)
 echo "[INIT] Populating scripts..."
 cp -r "$BOOTSTRAP_SRC/scripts/." /scripts/

@@ -59,8 +59,6 @@ RUN mkdir /var/run/sshd \
 # Generate SSH host keys at build time
 RUN ssh-keygen -A
 
-# Prepare cron run directory for PID file
-RUN mkdir -p /var/run/cron && chown toolhubuser:toolhubuser /var/run/cron
 
 WORKDIR /workspace
 EXPOSE 22 5656
