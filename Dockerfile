@@ -31,13 +31,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt /tmp/requirements.txt
 RUN pip3 install --no-cache-dir --break-system-packages -r /tmp/requirements.txt && rm /tmp/requirements.txt
 
-COPY scripts /bootstrap/scripts/
-COPY cron.d /bootstrap/cron.d/
-COPY logs /bootstrap/logs/
-COPY start.sh /start.sh
+COPY --chown=toolhubuser:toolhubuser --chmod=755 scripts /bootstrap/scripts/
+COPY --chown=toolhubuser:toolhubuser --chmod=755 cron.d /bootstrap/cron.d/
+COPY --chown=toolhubuser:toolhubuser --chmod=755 logs /bootstrap/logs/
+COPY --chown=toolhubuser:toolhubuser --chmod=755 start.sh /start.sh
 RUN sed -i 's/\r$$//' /start.sh
 RUN sed -i 's/\r$$//' /bootstrap/scripts/*.sh
-RUN chmod 755 /start.sh /bootstrap/scripts/*.sh
 
 ENV PATH="/scripts:$PATH"
 
@@ -52,4 +51,5 @@ RUN mkdir /var/run/sshd \
 
 WORKDIR /workspace
 EXPOSE 22 5656
+USER toolhubuser
 CMD ["bash", "/start.sh"]

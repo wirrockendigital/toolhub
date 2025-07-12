@@ -12,7 +12,9 @@ build:
 		--load .
 
 push:
-	docker push $(GHCR_REPO):$(IMAGE_TAG)
+	docker buildx build --platform=$(PLATFORM) \
+		-t $(GHCR_REPO):$(IMAGE_TAG) \
+		--push .
 
 run:
 	docker run -it --rm $(GHCR_REPO):$(IMAGE_TAG) /bin/bash
