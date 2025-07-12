@@ -49,9 +49,6 @@ RUN chmod -R 755 /bootstrap
 
 ENV PATH="/scripts:$PATH"
 
-# Benutzer anlegen
-RUN useradd -m -u 1061 -s /bin/bash toolhubuser \
-  && echo "toolhubuser:sj39fKF#dL92" | chpasswd
 
 # SSH & Firewall konfigurieren
 RUN mkdir /var/run/sshd \

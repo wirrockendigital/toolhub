@@ -1,5 +1,22 @@
 #!/bin/bash
-# start.sh - Bootstrap and launch Toolhub services
+# Dynamically set TOOLHUB_UID and TOOLHUB_GID from environment or defaults
+: "${TOOLHUB_UID:=1061}"
+: "${TOOLHUB_GID:=100}"
+
+# Ensure group exists or update its GID
+if getent group toolhubuser >/dev/null 2>&1; then
+  groupmod -g "$TOOLHUB_GID" toolhubuser
+else
+  groupadd -g "$TOOLHUB_GID" toolhubuser
+fi
+
+# Ensure user exists or update its UID and primary group
+if id -u toolhubuser >/dev/null 2>&1; then
+  usermod -u "$TOOLHUB_UID" -g "$TOOLHUB_GID" toolhubuser
+else
+  useradd -m -u "$TOOLHUB_UID" -g "$TOOLHUB_GID" -s /bin/bash toolhubuser
+  echo "toolhubuser:changeme" | chpasswd
+fi
 
 echo "[INIT] Starting bootstrap..."
 BOOTSTRAP_SRC="/bootstrap"
@@ -23,13 +40,11 @@ cp -r "$BOOTSTRAP_SRC/cron.d/." /etc/cron.d/
 echo "[INIT] Populating logs..."
 cp -r "$BOOTSTRAP_SRC/logs/." /logs/
 
-# Start SSH daemon
 echo "[INIT] Starting SSH daemon..."
-su - toolhubuser -c "/usr/sbin/sshd &"
+/usr/sbin/sshd &
 
-# Start cron daemon, writing PID into /var/run/cron
 echo "[INIT] Starting cron daemon..."
-su - toolhubuser -c "cron &"
+cron &
 
 # Launch webhook service with Gunicorn as toolhubuser
 echo "[INIT] Launching webhook service with Gunicorn as toolhubuser..."

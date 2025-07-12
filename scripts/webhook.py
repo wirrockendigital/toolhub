@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 import subprocess
 import logging
 import os
+from werkzeug.utils import secure_filename
+import uuid
+import zipfile
+import shutil
 
 # Define size units
 KB = 1024
@@ -68,6 +72,7 @@ def run_tool():
             return jsonify({"error": f"Ungültiger Pfad: {a}"}), 400
 
     logger.info(f"Request for tool={tool}, args={args}")
+    logger.info(f"Executing command: {cmd}")
 
     # Kommando zusammenbauen und ausführen
     cmd = [tool] + args
@@ -79,7 +84,6 @@ def run_tool():
             check=True,
             timeout=600
         )
-        logger.info(f"Request for tool={tool}, args={args}")
         return jsonify({
             "cmd": cmd,
             "stdout": result.stdout,
@@ -93,6 +97,92 @@ def run_tool():
             "stdout": e.stdout,
             "stderr": e.stderr
         }), 500
+
+
+# --- AUDIO SPLIT ENDPOINT ---
+@app.route("/audio-split", methods=["POST"])
+def audio_split():
+    logger.info(f"Audio split request: mode={request.form.get('mode')}, chunk_length={request.form.get('chunk_length')}, "
+                f"silence_seek={request.form.get('silence_seek')}, silence_duration={request.form.get('silence_duration')}, "
+                f"silence_threshold={request.form.get('silence_threshold')}, padding={request.form.get('padding')}")
+    # 1) Receive file and parameters
+    file = request.files.get("file")
+    if not file:
+        return jsonify({"error": "No audio file uploaded"}), 400
+
+    mode = request.form.get("mode")
+    try:
+        chunk_length = int(request.form.get("chunk_length", 0))
+    except ValueError:
+        return jsonify({"error": "Invalid chunk_length"}), 400
+
+    # Validate mode
+    if mode not in ("fixed", "silence"):
+        return jsonify({"error": "mode must be 'fixed' or 'silence'"}), 400
+
+    # Silence-specific parameters
+    silence_seek = int(request.form.get("silence_seek", 0)) if mode == "silence" else 0
+    try:
+        silence_duration = float(request.form.get("silence_duration", 0.0)) if mode == "silence" else 0.0
+    except ValueError:
+        return jsonify({"error": "Invalid silence_duration"}), 400
+    try:
+        silence_threshold = float(request.form.get("silence_threshold", 0.0)) if mode == "silence" else 0.0
+    except ValueError:
+        return jsonify({"error": "Invalid silence_threshold"}), 400
+    try:
+        padding = float(request.form.get("padding", 0.0)) if mode == "silence" else 0.0
+    except ValueError:
+        return jsonify({"error": "Invalid padding"}), 400
+
+    # 2) Save upload to shared input folder
+    job_id = str(uuid.uuid4())
+    input_dir = "/shared/audio/in"
+    output_dir = f"/shared/audio/out/{job_id}"
+    os.makedirs(input_dir, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
+
+    filename = secure_filename(file.filename)
+    input_path = os.path.join(input_dir, filename)
+    file.save(input_path)
+
+    # 3) Call the split script
+    cmd = [
+        "/scripts/split-audio.sh",
+        "--mode", mode,
+        "--chunk-length", str(chunk_length),
+        "--input", input_path,
+        "--output", output_dir
+    ]
+    if mode == "silence":
+        cmd += [
+            "--silence-seek", str(silence_seek),
+            "--silence-duration", str(silence_duration),
+            "--silence-threshold", str(silence_threshold),
+            "--padding", str(padding)
+        ]
+
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error running split script: {e}")
+        return jsonify({"error": str(e)}), 500
+
+    # 4) Zip the results
+    zip_path = f"/shared/audio/out/{job_id}.zip"
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for root, dirs, files in os.walk(output_dir):
+            for f_name in files:
+                file_path = os.path.join(root, f_name)
+                arcname = os.path.relpath(file_path, output_dir)
+                zf.write(file_path, arcname)
+
+    # 5) Clean up the folder
+    shutil.rmtree(output_dir)
+
+    # 6) Return the zip
+    return send_file(zip_path, mimetype="application/zip", as_attachment=True,
+                     download_name=f"split-audio-{job_id}.zip")
 
 if __name__ == "__main__":
     # Starte den Server auf Port 5656 (intern)
