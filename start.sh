@@ -19,6 +19,14 @@ fi
 echo "[INIT] Starting bootstrap..."
 BOOTSTRAP_SRC="/bootstrap"
 
+# Detect if /scripts is a mounted host volume vs. image content
+if grep -qs ' /scripts ' /proc/mounts; then
+  echo "[INIT] /scripts is a bind mount from host volume."
+else
+  echo "[INIT] /scripts is using embedded image content."
+fi
+
+
 # Ensure necessary directories exist with correct ownership
 for dir in /scripts /etc/cron.d /logs /var/run/cron; do
   echo "[INIT] Creating or fixing directory: $dir"
