@@ -6,18 +6,14 @@
 : "${TOOLHUB_UID:=1061}"
 : "${TOOLHUB_GID:=100}"
 
-# Ensure group exists or update its GID
-if getent group "$TOOLHUB_USER" >/dev/null 2>&1; then
-  groupmod -g "$TOOLHUB_GID" "$TOOLHUB_USER"
-else
+# Create group if it doesn't exist
+if ! getent group "$TOOLHUB_GID" >/dev/null; then
   groupadd -g "$TOOLHUB_GID" "$TOOLHUB_USER"
 fi
 
-# Ensure user exists or update its UID and primary group
-if id -u "$TOOLHUB_USER" >/dev/null 2>&1; then
-  usermod -u "$TOOLHUB_UID" -g "$TOOLHUB_USER" "$TOOLHUB_USER"
-else
-  useradd -m -u "$TOOLHUB_UID" -g "$TOOLHUB_USER" -s /bin/bash "$TOOLHUB_USER"
+# Create user if it doesn't exist
+if ! id -u "$TOOLHUB_USER" >/dev/null 2>&1; then
+  useradd -m -u "$TOOLHUB_UID" -g "$TOOLHUB_GID" -s /bin/bash "$TOOLHUB_USER"
   echo "$TOOLHUB_USER:$TOOLHUB_PASSWORD" | chpasswd
 fi
 
