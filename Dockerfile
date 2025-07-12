@@ -32,7 +32,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt /tmp/requirements.txt
 RUN pip3 install --no-cache-dir --break-system-packages -r /tmp/requirements.txt && rm /tmp/requirements.txt
 # Install Gunicorn for production WSGI server
-RUN pip3 install --no-cache-dir gunicorn
+RUN apt-get update && apt-get install -y --no-install-recommends python3-gunicorn && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Bootstrap-Dateien kopieren mit korrekten Rechten
 COPY --chown=toolhubuser:toolhubuser --chmod=755 scripts/ /bootstrap/scripts/
