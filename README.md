@@ -1,5 +1,3 @@
-**Author & Creator:**  
-**Eric Herrmannsdörfer**  
 [wir.rocken.digital](https://wir.rocken.digital)  
 
 
