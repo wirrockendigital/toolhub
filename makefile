@@ -11,7 +11,7 @@ build:
 		-t $(GHCR_REPO):$(IMAGE_TAG) \
 		--load .
 
-push:
+push:s
 	docker buildx build --platform=$(PLATFORM) \
 		-t $(GHCR_REPO):$(IMAGE_TAG) \
 		--push .
