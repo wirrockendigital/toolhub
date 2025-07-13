@@ -12,9 +12,8 @@ GROUP_NAME="users"
 
 # Create user if it doesn't exist
 if ! id -u "$TOOLHUB_USER" >/dev/null 2>&1; then
-  useradd -m -u "$TOOLHUB_UID" -g "$GROUP_NAME" -s /bin/bash "$TOOLHUB_USER"
+  useradd -u "$TOOLHUB_UID" -g "$GROUP_NAME" -s /bin/bash -d /workspace "$TOOLHUB_USER"
   echo "$TOOLHUB_USER:$TOOLHUB_PASSWORD" | chpasswd
-  usermod -d /workspace "$TOOLHUB_USER"
 fi
 
 echo "[INIT] Starting bootstrap..."
