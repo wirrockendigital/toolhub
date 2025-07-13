@@ -22,3 +22,4 @@ alias py='python3'
 
 # Logs live ansehen
 alias watchwhlog='tail -f /logs/twebhook.log'
+sssss
