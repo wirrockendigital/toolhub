@@ -37,7 +37,7 @@ app = Flask(__name__)
 def test():
     """Simple test endpoint to verify server is running."""
     data = request.get_json(force=True)
-    return jsonify({"status": "ok", "message": "TEST 1", "received": data})
+    return jsonify({"status": "ok", "message": "TEST 4", "received": data})
 
 
 # Max JSON-Payload auf 1 GB begrenzen
