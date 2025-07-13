@@ -67,6 +67,7 @@ cron &
 
 # Launch webhook service with Gunicorn as toolhubuser
 echo "[INIT] Launching webhook service with Gunicorn as $TOOLHUB_USER..."
+export PYTHONPATH="/scripts"
 exec su - "$TOOLHUB_USER" -c "cd /scripts && gunicorn --bind 0.0.0.0:5656 webhook:app"
 
 # Symlink .bashrc from /workspace/conf/.bashrc if it exists
