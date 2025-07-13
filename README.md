@@ -1,4 +1,3 @@
-
 **Author & Creator:**  
 **Eric Herrmannsdörfer**  
 [wir.rocken.digital](https://wir.rocken.digital)  
@@ -13,7 +12,7 @@
 
 ## Features
 
-- **CLI Tools**: `curl`, `wget`, `git`, `ffmpeg` (including `ffprobe`), `jq`, `yq`, `unzip`, `imagemagick`, `sox`, `bc`, `lsof`, `tree`, `htop`, `exiftool`, and more.  
+- **CLI Tools**: curl, wget, git, ffmpeg, jq, yq, unzip, imagemagick, sox, python3, python3-pip, nano, less, net-tools, dnsutils, lsof, tree, htop, exiftool, bc, cron, openssh-server  
 - **Python Support**: Python 3 + pip3, with additional libraries installed via `requirements.txt` (e.g. `flask`, `ffmpeg-python`, `requests`, `numpy`).  
 - **SSH Access**: Secure SSH (port 22) access within your network.  
 - **HTTP Webhook**: Flexible API endpoint (port 5656) to run any CLI tool.  
@@ -34,6 +33,29 @@
    - `/volume1/docker/toolhub/cron.d` (mounted as `/etc/cron.d`)  
    - `/volume1/docker/toolhub/logs` (mounted as `/logs`)
    - In your `docker-compose.yml`, configure the user with `user: "<UID>:<GID>"` (e.g., `user: "1061:100"`) to match the host directory permissions.
+
+> **Note:** Toolhub is specifically designed for use on Synology NAS systems. Please manually create all required directories before creating the container:
+>
+> - /volume1/docker/toolhub/
+> - /volume1/docker/toolhub/conf
+> - /volume1/docker/toolhub/cron.d
+> - /volume1/docker/toolhub/scripts
+> - /volume1/docker/toolhub/logs
+> - /volume1/docker/shared
+>
+> Make sure all directories have the correct write permissions for the NAS user you are using (e.g., UID 1061).
+>
+> Additionally, the `.env` file must be placed in the `/volume1/docker/toolhub/conf` directory before installation. This file contains e.g. the following values:
+> 
+> ```env
+> TOOLHUB_USER=toolhubuser
+> TOOLHUB_PASSWORD=toolhub123
+> TOOLHUB_UID=1061
+> TOOLHUB_GID=100
+> TOOLHUB_FORCE_UPDATE=1
+> ```
+> 
+> Ensure that `TOOLHUB_UID` and `TOOLHUB_GID` correspond to the user and group IDs on your Synology NAS to guarantee smooth write access to the mounted volumes.
 
 ---
 
@@ -116,6 +138,8 @@ ssh toolhubuser@<NAS-IP> -p 22
 ├── Dockerfile
 ├── requirements.txt
 ├── README.md
+├── conf/
+│   └── .env
 ├── scripts/
 │   ├── split-audio.sh
 │   └── webhook.py
