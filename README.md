@@ -25,16 +25,15 @@
 ## Prerequisites
 
 1. A Synology NAS or similar with Docker (Portainer recommended).  
-2. A Docker network named `alle-meine-docker-net` (e.g., subnet 192.168.128.0/24).  
+2. A Docker network named `allmydocker-net` (e.g., subnet 192.168.123.0/24).  
 3. Host directories:
    - `/volume1/docker/toolhub` (repository, Dockerfile, scripts, cron files)  
    - `/volume1/docker/shared` (shared work directory, mounted as `/shared`)  
    - `/volume1/docker/toolhub/scripts` (mounted as `/scripts`)  
    - `/volume1/docker/toolhub/cron.d` (mounted as `/etc/cron.d`)  
    - `/volume1/docker/toolhub/logs` (mounted as `/logs`)
-   - In your `docker-compose.yml`, configure the user with `user: "<UID>:<GID>"` (e.g., `user: "1061:100"`) to match the host directory permissions.
 
-> **Note:** Toolhub is specifically designed for use on Synology NAS systems. Please manually create all required directories before creating the container:
+> **Note:** Toolhub is specifically designed for use on Synology NAS systems. Please manually create all required directories before deploying the container:
 >
 > - /volume1/docker/toolhub/
 > - /volume1/docker/toolhub/conf
@@ -43,25 +42,65 @@
 > - /volume1/docker/toolhub/logs
 > - /volume1/docker/shared
 >
-> Make sure all directories have the correct write permissions for the NAS user you are using (e.g., UID 1061).
+> Ensure all directories have appropriate write permissions based on your Synology NAS user (e.g., UID 1061).
 >
-> Additionally, the `.env` file must be placed in the `/volume1/docker/toolhub/conf` directory before installation. This file contains e.g. the following values:
-> 
-> ```env
-> TOOLHUB_USER=toolhubuser
-> TOOLHUB_PASSWORD=toolhub123
-> TOOLHUB_UID=1061
-> TOOLHUB_GID=100
-> TOOLHUB_FORCE_UPDATE=1
-> ```
-> 
-> Ensure that `TOOLHUB_UID` and `TOOLHUB_GID` correspond to the user and group IDs on your Synology NAS to guarantee smooth write access to the mounted volumes.
+> When deploying using Portainer, upload a `stack.env` file via the stack creation interface. This file defines environment variables such as:
+>
+> - `TOOLHUB_USER`
+> - `TOOLHUB_PASSWORD`
+> - `TOOLHUB_UID`
+> - `TOOLHUB_GID`
+>
+> These values can be modified in Portainer after uploading.
 
 ---
 
 ## Installation
 
+
 ### Using Portainer Stack
+
+#### Example stack.yml (Portainer-compatible)
+
+Below is a recommended `stack.yml` configuration for deploying Toolhub via Portainer:
+
+```yaml
+version: "3.9"
+
+services:
+  toolhub:
+    image: ghcr.io/wirrockendigital/toolhub:latest
+    container_name: toolhub
+    hostname: toolhub
+    restart: always
+    stdin_open: true
+    tty: true
+    expose:
+      - "22"
+      - "5656"
+    ports:
+      - "2222:22"
+      - "5656:5656"
+    volumes:
+      - /volume1/docker/toolhub:/workspace
+      - /volume1/docker/toolhub/shared:/shared
+      - /volume1/docker/toolhub/scripts:/scripts
+      - /volume1/docker/toolhub/cron.d:/etc/cron.d
+      - /volume1/docker/toolhub/logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:5656/test || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      allmydocker-net:
+        ipv4_address: 192.168.123.100
+
+networks:
+  allmydocker-net:
+    external: true
+```
 
 1. In Portainer, go to **Stacks** → **Add Stack**.  
 2. Paste the contents of `stack.yml` into the stack definition.  
@@ -76,8 +115,8 @@ docker build -t toolhub:latest .
 
 docker run -d \
   --name toolhub \
-  --network alle-meine-docker-net \
-  --ip 192.168.128.100 \
+  --network allmydocker-net \
+  --ip 192.168.123.100 \
   -v /volume1/docker/toolhub:/workspace \
   -v /volume1/docker/shared:/shared \
   -v /volume1/docker/toolhub/scripts:/scripts \
