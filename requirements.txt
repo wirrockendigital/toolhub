@@ -3,4 +3,3 @@ ffmpeg-python
 requests
 numpy
 gunicorn
-s
