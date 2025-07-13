@@ -104,8 +104,10 @@ networks:
 
 1. In Portainer, go to **Stacks** → **Add Stack**.  
 2. Paste the contents of `stack.yml` into the stack definition.  
-3. Confirm that volumes and network settings are correct.  
-4. Click **Deploy the Stack**.
+3. Confirm that volumes and network settings are correct.
+4. Upload the stack.env
+5. Change the environment variables as needed.
+6. Click **Deploy the Stack**.
 
 ### Using Docker CLI
 
