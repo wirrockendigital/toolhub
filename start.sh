@@ -56,8 +56,6 @@ else
   echo "[INIT] /scripts already initialized – skipping bootstrap copy"
 fi
 
-wwwwww
-
 echo "[INIT] Starting SSH daemon..."
 /usr/sbin/sshd &
 
