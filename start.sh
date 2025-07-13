@@ -43,19 +43,17 @@ for d in "$SHARED_DIR" "$SHARED_DIR/audio" "$SHARED_DIR/audio/in" "$SHARED_DIR/a
 done
 
 
-# Conditional bootstrap overwrite
-if [[ "$TOOLHUB_FORCE_UPDATE" == "1" ]]; then
-  echo "[INIT] TOOLHUB_FORCE_UPDATE=1: Overwriting all bootstrap files..."
+
+
+# Always copy default bootstrap content if not previously initialized
+if [[ ! -f /scripts/.initialized ]]; then
+  echo "[INIT] First-time bootstrap: copying default content..."
   cp -r "$BOOTSTRAP_SRC/scripts/." /scripts/
   cp -r "$BOOTSTRAP_SRC/cron.d/." /etc/cron.d/
   cp -r "$BOOTSTRAP_SRC/logs/." /logs/
-elif grep -qs ' /scripts ' /proc/mounts; then
-  echo "[INIT] Detected host volume on /scripts: skipping overwrite"
+  touch /scripts/.initialized
 else
-  echo "[INIT] No host volume and TOOLHUB_FORCE_UPDATE!=1: populating from bootstrap"
-  cp -r "$BOOTSTRAP_SRC/scripts/." /scripts/
-  cp -r "$BOOTSTRAP_SRC/cron.d/." /etc/cron.d/
-  cp -r "$BOOTSTRAP_SRC/logs/." /logs/
+  echo "[INIT] /scripts already initialized – skipping bootstrap copy"
 fi
 
 
