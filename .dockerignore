@@ -2,5 +2,5 @@
 docker-compose.yml
 README.md
 stack.env
+stack.yml
 docs
-docker
