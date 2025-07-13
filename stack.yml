@@ -33,4 +33,3 @@ services:
 networks:
   allmydocker-net:
     external: true
-    wirrockendigital
