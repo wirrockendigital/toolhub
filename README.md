@@ -42,16 +42,16 @@
 > - /volume1/docker/toolhub/logs
 > - /volume1/docker/shared
 >
-> Ensure all directories have appropriate write permissions based on your Synology NAS user (e.g., UID 1061).
+> Ensure all directories have appropriate write permissions based on your Synology NAS user (e.g., UID 1061). The UID and GID must match the values defined in your `stack.env` file to ensure proper permissions inside the container.
 >
 > When deploying using Portainer, upload a `stack.env` file via the stack creation interface. This file defines environment variables such as:
 >
-> - `TOOLHUB_USER`
-> - `TOOLHUB_PASSWORD`
-> - `TOOLHUB_UID`
-> - `TOOLHUB_GID`
+> - TOOLHUB_USER=toolhubuser
+> - TOOLHUB_PASSWORD=toolhub123
+> - TOOLHUB_UID=1061
+> - TOOLHUB_GROUP=100
 >
-> These values can be modified in Portainer after uploading.
+> These values can be modified in Portainer after uploading the `stack.env`
 
 ---
 
