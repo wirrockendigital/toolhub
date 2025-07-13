@@ -60,6 +60,6 @@ RUN mkdir /var/run/sshd \
 RUN ssh-keygen -A
 
 
-WORKDIR /workspace
+WORKDIR /workspacew
 EXPOSE 22 5656
 CMD ["bash", "/start.sh"]
