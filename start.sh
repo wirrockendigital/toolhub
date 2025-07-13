@@ -14,6 +14,7 @@ GROUP_NAME="users"
 if ! id -u "$TOOLHUB_USER" >/dev/null 2>&1; then
   useradd -m -u "$TOOLHUB_UID" -g "$GROUP_NAME" -s /bin/bash "$TOOLHUB_USER"
   echo "$TOOLHUB_USER:$TOOLHUB_PASSWORD" | chpasswd
+  usermod -d /workspace "$TOOLHUB_USER"
 fi
 
 echo "[INIT] Starting bootstrap..."
@@ -42,17 +43,22 @@ for d in "$SHARED_DIR" "$SHARED_DIR/audio" "$SHARED_DIR/audio/in" "$SHARED_DIR/a
   chown "$TOOLHUB_USER:$GROUP_NAME" "$d"
 done
 
- # Populate scripts (conditional overwrite)
+
+# Conditional bootstrap overwrite
 if [[ "$TOOLHUB_FORCE_UPDATE" == "1" ]]; then
-  echo "[INIT] Overwriting scripts (TOOLHUB_FORCE_UPDATE=1)..."
+  echo "[INIT] TOOLHUB_FORCE_UPDATE=1: Overwriting all bootstrap files..."
   cp -r "$BOOTSTRAP_SRC/scripts/." /scripts/
-  echo "[INIT] Overwriting cron.d (TOOLHUB_FORCE_UPDATE=1)..."
   cp -r "$BOOTSTRAP_SRC/cron.d/." /etc/cron.d/
-  echo "[INIT] Overwriting logs (TOOLHUB_FORCE_UPDATE=1)..."
   cp -r "$BOOTSTRAP_SRC/logs/." /logs/
+elif grep -qs ' /scripts ' /proc/mounts; then
+  echo "[INIT] Detected host volume on /scripts: skipping overwrite"
 else
-  echo "[INIT] Skipping script/cron/log overwrite (TOOLHUB_FORCE_UPDATE not set)"
+  echo "[INIT] No host volume and TOOLHUB_FORCE_UPDATE!=1: populating from bootstrap"
+  cp -r "$BOOTSTRAP_SRC/scripts/." /scripts/
+  cp -r "$BOOTSTRAP_SRC/cron.d/." /etc/cron.d/
+  cp -r "$BOOTSTRAP_SRC/logs/." /logs/
 fi
+
 
 echo "[INIT] Starting SSH daemon..."
 /usr/sbin/sshd &
