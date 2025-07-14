@@ -4,19 +4,27 @@ Eric
 # Toolhub
 **Version:** 0.1 (2025-07-11)
 
-**Toolhub** is a universal sidecar Docker container that offers a collection of useful command-line tools, SSH access, HTTP webhooks, and cron jobs. You can invoke installed tools via SSH, predefined scripts, or a flexible webhook API—ideal for automations in n8n, scheduled tasks, and manual interventions.
+**Toolhub** is a universal sidecar Docker container—a Swiss Army knife for modern automation stacks. It integrates with tools like n8n, Node-RED, Activepieces, Windmill, and Flowise to provide instant access to powerful command-line tools, Python scripts, cron jobs, and webhook-triggered automation logic.
+
+**Note:** Toolhub is specifically optimized for plug-and-play use on Synology NAS systems, but also works seamlessly on other Docker-compatible environments.
 
 ---
 
 ## Features
 
-- **CLI Tools**: curl, wget, git, ffmpeg, jq, yq, unzip, imagemagick, sox, python3, python3-pip, nano, less, net-tools, dnsutils, lsof, tree, htop, exiftool, bc, cron, openssh-server  
-- **Python Support**: Python 3 + pip3, with additional libraries installed via `requirements.txt` (e.g. `flask`, `ffmpeg-python`, `requests`, `numpy`).  
-- **SSH Access**: Secure SSH (port 22) access within your network.  
-- **HTTP Webhook**: Flexible API endpoint (port 5656) to run any CLI tool.  
-- **Cron Jobs**: Drop cron files into `/etc/cron.d` to schedule daily or hourly tasks.  
-- **Custom Scripts**: Mount `/scripts` for your own shell or Python scripts (e.g. `split-audio.sh`).  
-- **Persistent Logs**: All logs are stored under `/logs` and persisted via a host volume.
+- **CLI Tools**:
+  - Core tools: `curl`, `wget`, `git`, `nano`, `less`, `tree`, `unzip`, `cron`, `openssh-server`, `build-essential`
+  - Python: `python3`, `python3-pip`, `python3-venv`, `virtualenv`
+  - Media processing: `ffmpeg`, `ffprobe`, `sox`, `imagemagick`, `gifsicle`, `exiftool`, `poppler-utils`, `tesseract-ocr`
+  - Data & automation: `jq`, `yq`, `aria2`, `bc`
+
+- **Python Libraries**:
+  - Web & API clients: `requests`, `httpx`, `python-dotenv`, `flask`, `flask-cors`
+  - CLI/Terminal formatting: `click`, `rich`, `loguru`, `colorama`, `tqdm`, `tabulate`
+  - Filesystem & automation: `pyyaml`, `markdown`, `watchdog`
+  - Media/audio: `ffmpeg-python`, `pydub`
+  - Data handling: `numpy`, `openpyxl`
+  - Text processing: `beautifulsoup4`, `html2text`, `markdownify`, `pypandoc`, `pdfminer.six`, `python-docx`
 
 ---
 
