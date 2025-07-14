@@ -4,63 +4,63 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Base system & essentials
 RUN apt-get update && apt-get install -y --no-install-recommends \
-  curl \                        # Command-line tool for HTTP requests
-  wget \                        # Download files from the internet
-  git \                         # Git version control
-  nano \                        # Terminal text editor
-  less \                        # View text files page by page
-  tree \                        # Show directory structure as a tree
-  unzip \                       # Extract .zip files
-  cron \                        # Cron daemon for scheduled tasks
-  openssh-server \              # SSH server
-  build-essential \             # Essential C/C++ build tools
-  python3 \                     # Python interpreter
-  python3-pip \                 # Python package installer
-  python3-venv \                # Python virtual environments
-  virtualenv \                  # Legacy Python virtualenv tool
+  curl \
+  wget \
+  git \
+  nano \
+  less \
+  tree \
+  unzip \
+  cron \
+  openssh-server \
+  build-essential \
+  python3 \
+  python3-pip \
+  python3-venv \
+  virtualenv \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Optional: Networking & diagnostics (uncomment for troubleshooting)
 # RUN apt-get update && apt-get install -y --no-install-recommends \
-#   net-tools \                    # ifconfig, netstat, etc.
-#   dnsutils \                     # dig, nslookup
-#   nmap \                         # Network scanner
-#   iperf3 \                       # Network bandwidth tester
-#   tcpdump \                      # Network packet capture
-#   iftop \                        # Live bandwidth usage
-#   bmon \                         # Bandwidth monitor
-#   ncdu \                         # Disk usage viewer
+#   net-tools \
+#   dnsutils \
+#   nmap \
+#   iperf3 \
+#   tcpdump \
+#   iftop \
+#   bmon \
+#   ncdu \
 #   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Optional: Monitoring & debugging tools (uncomment for troubleshooting)
 # RUN apt-get update && apt-get install -y --no-install-recommends \
-#   lsof \                        # List open files and sockets
-#   htop \                        # Interactive process viewer
-#   iotop \                       # Disk I/O monitor
-#   strace \                      # Trace system calls and signals
+#   lsof \
+#   htop \
+#   iotop \
+#   strace \
 #   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # File tools & automation (minimal + relevant for automation / n8n)
 # RUN apt-get update && apt-get install -y --no-install-recommends \
-#   fd-find \                      # Simple, fast file search (fd)
-#   ripgrep \                      # Fast recursive text search
-#   moreutils \                    # Useful shell tools like sponge, ts, etc.
+#   fd-find \
+#   ripgrep \
+#   moreutils \
 #   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Media & processing
 RUN apt-get update && apt-get install -y --no-install-recommends \
-  ffmpeg \                      # Audio/video processing
-  ffprobe \                     # Extract metadata from media files
-  sox \                         # Audio processing and conversion
-  imagemagick \                 # Image manipulation
-  gifsicle \                    # GIF image optimization
-  exiftool \                    # Read/write image metadata
-  poppler-utils \               # PDF text/image extraction
-  tesseract-ocr \               # OCR engine
-  aria2 \                       # Advanced download manager
-  jq \                          # JSON CLI processor
-  yq \                          # YAML CLI processor
-  bc \                          # Command-line calculator
+  ffmpeg \
+  ffprobe \
+  sox \
+  imagemagick \
+  gifsicle \
+  exiftool \
+  poppler-utils \
+  tesseract-ocr \
+  aria2 \
+  jq \
+  yq \
+  bc \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Fix fd symlink (fd-find on Debian/Ubuntu)
