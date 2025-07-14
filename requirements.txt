@@ -1,5 +1,55 @@
-flask
-ffmpeg-python
-requests
-numpy
-gunicorn
+# Web & API Clients
+requests                 # Simplified HTTP client
+httpx                    # Async HTTP client
+python-dotenv            # Load environment variables from .env files
+flask                    # Lightweight WSGI web framework
+flask-cors               # CORS support for Flask
+
+# Terminal & CLI Frameworks
+click                    # CLI framework
+rich                     # Terminal formatting and output
+loguru                   # Better logging
+colorama                 # Color formatting in terminal (Windows compat)
+tqdm                     # Progress bars
+tabulate                 # Pretty-print tabular data
+
+# Scheduler & Automation
+# schedule                 # Job scheduling
+watchdog                 # Filesystem event monitoring
+
+# Filesystem, Parsing, Formats
+pyyaml                  # YAML parser and emitter
+# xmltodict             # XML to dict converter (not used)
+# json5                 # JSON5 support (relaxed JSON)
+markdown                # Markdown to HTML conversion
+# python-magic          # File type detection via libmagic
+
+# Audio / Media
+ffmpeg-python            # Python bindings for FFmpeg
+pydub                    # High-level audio manipulation
+# audioread             # Backend audio decoding for pydub (included via pydub)
+# mutagen               # Audio metadata tagging
+# Pillow                # Image processing (included in ImageMagick)
+
+# Data & Numerics
+numpy                    # Array and numerical operations
+# pandas                # Dataframes and CSV/XLS manipulation (not currently used)
+openpyxl              # Excel xlsx support
+# xlrd                  # Excel xls support (legacy)
+
+# Shell Utilities & Interactive Tools
+# prompt-toolkit        # Interactive command-line input
+# typer                 # Fast CLI builder (alternative to Click)
+
+# Dev & Debugging Tools
+# ipython               # Interactive Python shell
+# debugpy               # VS Code Python debugging support
+
+# Text Parsing / Converters
+beautifulsoup4           # HTML/XML parsing and cleanup
+html2text             # HTML to Markdown conversion
+markdownify           # HTML to Markdown converter
+pypandoc              # Universal document converter
+pdfminer.six          # PDF text extraction
+python-docx           # Read/write Word documents
+# textract              # Unified document text extractor
