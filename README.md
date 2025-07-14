@@ -34,10 +34,10 @@ Eric
 2. A Docker network named `allmydocker-net` (e.g., subnet 192.168.123.0/24).  
 3. Host directories:
    - `/volume1/docker/toolhub` (repository, Dockerfile, scripts, cron files)  
-   - `/volume1/docker/shared` (shared work directory, mounted as `/shared`)  
    - `/volume1/docker/toolhub/scripts` (mounted as `/scripts`)  
    - `/volume1/docker/toolhub/cron.d` (mounted as `/etc/cron.d`)  
    - `/volume1/docker/toolhub/logs` (mounted as `/logs`)
+   - `/volume1/docker/shared` (shared work directory, mounted as `/shared`)
 
 > **Note:** Toolhub is specifically designed for use on Synology NAS systems. Please manually create all required directories before deploying the container:
 >
