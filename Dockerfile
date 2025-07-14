@@ -3,65 +3,57 @@ FROM debian:bookworm
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Base system & essentials
-RUN apt-get update && apt-get install -y --no-install-recommends \
-  curl \
-  wget \
-  git \
-  nano \
-  less \
-  tree \
-  unzip \
-  cron \
-  openssh-server \
-  build-essential \
-  python3 \
-  python3-pip \
-  python3-venv \
-  virtualenv \
-  && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends curl       # Command-line tool for HTTP requests
+RUN apt-get install -y --no-install-recommends wget                         # Download files from the internet
+RUN apt-get install -y --no-install-recommends git                          # Git version control
+RUN apt-get install -y --no-install-recommends nano                         # Terminal text editor
+RUN apt-get install -y --no-install-recommends less                         # View text files page by page
+RUN apt-get install -y --no-install-recommends tree                         # Show directory structure as a tree
+RUN apt-get install -y --no-install-recommends unzip                        # Extract .zip files
+RUN apt-get install -y --no-install-recommends cron                         # Cron daemon for scheduled tasks
+RUN apt-get install -y --no-install-recommends openssh-server               # SSH server
+RUN apt-get install -y --no-install-recommends build-essential              # Essential C/C++ build tools
+RUN apt-get install -y --no-install-recommends python3                      # Python interpreter
+RUN apt-get install -y --no-install-recommends python3-pip                  # Python package installer
+RUN apt-get install -y --no-install-recommends python3-venv                 # Python virtual environments
+RUN apt-get install -y --no-install-recommends virtualenv                   # Legacy Python virtualenv tool
 
 # Optional: Networking & diagnostics (uncomment for troubleshooting)
-# RUN apt-get update && apt-get install -y --no-install-recommends \
-#   net-tools \
-#   dnsutils \
-#   nmap \
-#   iperf3 \
-#   tcpdump \
-#   iftop \
-#   bmon \
-#   ncdu \
-#   && apt-get clean && rm -rf /var/lib/apt/lists/*
+# RUN apt-get update && apt-get install -y --no-install-recommends net-tools     # ifconfig, netstat
+# RUN apt-get install -y --no-install-recommends dnsutils                         # dig, nslookup
+# RUN apt-get install -y --no-install-recommends nmap                             # Network scanner
+# RUN apt-get install -y --no-install-recommends iperf3                           # Network bandwidth tester
+# RUN apt-get install -y --no-install-recommends tcpdump                          # Network packet capture
+# RUN apt-get install -y --no-install-recommends iftop                            # Live bandwidth usage
+# RUN apt-get install -y --no-install-recommends bmon                             # Bandwidth monitor
+# RUN apt-get install -y --no-install-recommends ncdu                             # Disk usage analyzer
 
 # Optional: Monitoring & debugging tools (uncomment for troubleshooting)
-# RUN apt-get update && apt-get install -y --no-install-recommends \
-#   lsof \
-#   htop \
-#   iotop \
-#   strace \
-#   && apt-get clean && rm -rf /var/lib/apt/lists/*
+# RUN apt-get update && apt-get install -y --no-install-recommends lsof          # List open files
+# RUN apt-get install -y --no-install-recommends htop                             # Interactive process viewer
+# RUN apt-get install -y --no-install-recommends iotop                            # Disk I/O monitor
+# RUN apt-get install -y --no-install-recommends strace                           # Trace system calls
 
 # File tools & automation (minimal + relevant for automation / n8n)
-# RUN apt-get update && apt-get install -y --no-install-recommends \
-#   fd-find \
-#   ripgrep \
-#   moreutils \
-#   && apt-get clean && rm -rf /var/lib/apt/lists/*
+# RUN apt-get update && apt-get install -y --no-install-recommends fd-find       # Fast file search (fd)
+# RUN apt-get install -y --no-install-recommends ripgrep                          # Recursive text search
+# RUN apt-get install -y --no-install-recommends moreutils                        # Extra Unix tools (e.g. sponge)
 
 # Media & processing
-RUN apt-get update && apt-get install -y --no-install-recommends \
-  ffmpeg \
-  ffprobe \
-  sox \
-  imagemagick \
-  gifsicle \
-  exiftool \
-  poppler-utils \
-  tesseract-ocr \
-  aria2 \
-  jq \
-  yq \
-  bc \
-  && apt-get clean && rm -rf /var/lib/apt/lists/*
+# Media & processing
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg     # ffmpeg inkl. ffprobe
+RUN apt-get install -y --no-install-recommends sox                           # Audio processing and conversion
+RUN apt-get install -y --no-install-recommends imagemagick                   # Image manipulation
+RUN apt-get install -y --no-install-recommends gifsicle                      # GIF image optimization
+RUN apt-get install -y --no-install-recommends exiftool                      # Image metadata editing
+RUN apt-get install -y --no-install-recommends poppler-utils                 # PDF utilities (e.g. pdftotext)
+RUN apt-get install -y --no-install-recommends tesseract-ocr                 # OCR engine
+RUN apt-get install -y --no-install-recommends aria2                         # Advanced CLI downloader
+RUN apt-get install -y --no-install-recommends jq                            # JSON processor
+RUN apt-get install -y --no-install-recommends yq                            # YAML processor
+RUN apt-get install -y --no-install-recommends bc                            # Command-line calculator
+
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Fix fd symlink (fd-find on Debian/Ubuntu)
 RUN ln -s $(which fdfind) /usr/local/bin/fd
