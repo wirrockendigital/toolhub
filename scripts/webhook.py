@@ -32,14 +32,6 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 
-# --- TEST ENDPOINT ---
-@app.route("/test", methods=["POST"])
-def test():
-    """Simple test endpoint to verify server is running."""
-    data = request.get_json(force=True)
-    return jsonify({"status": "ok", "message": "TEST 4", "received": data})
-
-
 # Max JSON-Payload auf 1 GB begrenzen
 app.config['MAX_CONTENT_LENGTH'] = MAX_PAYLOAD_SIZE
 
@@ -107,6 +99,16 @@ def run_tool():
             "stdout": e.stdout,
             "stderr": e.stderr
         }), 500
+
+
+# --- TEST ENDPOINT ---
+@app.route("/test", methods=["GET", "POST"])
+def test():
+    if request.method == "GET":
+        return jsonify({"status": "ok"}), 200
+
+    data = request.get_json(force=True)
+    return jsonify({"status": "ok", "message": "Toolhub webhook service is running", "received": data})
 
 
 # --- AUDIO SPLIT ENDPOINT ---
