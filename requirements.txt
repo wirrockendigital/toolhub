@@ -5,6 +5,9 @@ python-dotenv            # Load environment variables from .env files
 flask                    # Lightweight WSGI web framework
 flask-cors               # CORS support for Flask
 
+# Webserver
+gunicorn                # WSGI HTTP server for Python apps
+
 # Terminal & CLI Frameworks
 click                    # CLI framework
 rich                     # Terminal formatting and output
