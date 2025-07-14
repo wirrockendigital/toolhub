@@ -40,7 +40,6 @@ RUN apt-get install -y --no-install-recommends virtualenv                   # Le
 # RUN apt-get install -y --no-install-recommends moreutils                        # Extra Unix tools (e.g. sponge)
 
 # Media & processing
-# Media & processing
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg     # ffmpeg inkl. ffprobe
 RUN apt-get install -y --no-install-recommends sox                           # Audio processing and conversion
 RUN apt-get install -y --no-install-recommends imagemagick                   # Image manipulation
