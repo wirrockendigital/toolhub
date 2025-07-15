@@ -24,7 +24,7 @@ run_and_log() {
 }
 # audio-split.sh - Split audio files in fixed or silence-based chunks
 # Usage:
-#   ./audio-split.sh --mode fixed|silence --chunk-length <seconds> --input <file> [--output <dir>] [--silence-seek <seconds>] [--silence-duration <seconds>] [--silence-threshold <dB>] [--padding <seconds>]
+#   ./audio-split.sh --mode fixed|silence --chunk-length <seconds> --input <file> [--output <dir>] [--silence-seek <seconds>] [--silence-duration <seconds>] [--silence-threshold <dB>] [--padding <seconds>] [--enhance] [--enhance-speech]
 
 
 # Default directories
@@ -44,13 +44,21 @@ while [[ $# -gt 0 ]]; do
     --silence-duration) SILENCE_DURATION="$2"; shift 2;;
     --silence-threshold) SILENCE_THRESHOLD="$2"; shift 2;;
     --padding) PADDING="$2"; shift 2;;
+    --enhance) ENHANCE=1; shift ;;
+    --enhance-speech) ENHANCE_SPEECH=1; shift ;;
     *) echo "Unknown parameter: $1"; exit 1;;
   esac
 done
 
+# Ensure enhance flags are mutually exclusive
+if [[ -n "$ENHANCE" && -n "$ENHANCE_SPEECH" ]]; then
+  echo "Error: --enhance and --enhance-speech cannot be used together" >&2
+  exit 1
+fi
+
 # Validate required parameters
 if [[ -z "$MODE" || -z "$CHUNK_LENGTH" || -z "$INPUT_PATH" ]]; then
-  echo "Usage: $0 --mode fixed|silence --chunk-length <seconds> --input <file> [--output <dir>] [--silence-seek <seconds>] [--silence-duration <seconds>] [--silence-threshold <dB>] [--padding <seconds>]"
+  echo "Usage: $0 --mode fixed|silence --chunk-length <seconds> --input <file> [--output <dir>] [--silence-seek <seconds>] [--silence-duration <seconds>] [--silence-threshold <dB>] [--padding <seconds>] [--enhance] [--enhance-speech]"
   exit 1
 fi
 
@@ -69,6 +77,21 @@ if [[ "$INPUT_PATH" != /* ]]; then
   INPUT_FILE="$BASE_IN_DIR/$INPUT_PATH"
 else
   INPUT_FILE="$INPUT_PATH"
+fi
+
+# Preprocess audio with optional filters
+if [[ "$ENHANCE_SPEECH" == "1" ]]; then
+  FILTERS="highpass=f=80, lowpass=f=4000, equalizer=f=1000:width_type=o:width=2:g=6, afftdn"
+elif [[ "$ENHANCE" == "1" ]]; then
+  FILTERS="highpass=f=100, lowpass=f=3000, afftdn"
+fi
+
+if [[ -n "$FILTERS" ]]; then
+  echo "Enhancing audio: setting mono, 16kHz, 64k bitrate, filters [$FILTERS]"
+  ENHANCED_FILE=$(mktemp --suffix ".m4a")
+  run_and_log ffmpeg -y -i "$INPUT_FILE" -ar 16000 -ac 1 -b:a 64k -af "$FILTERS" "$ENHANCED_FILE" \
+    || { echo "Error enhancing audio" >&2; exit 1; }
+  INPUT_FILE="$ENHANCED_FILE"
 fi
 
 # Determine output directory
@@ -159,6 +182,10 @@ else
     START="$END"
     INDEX=$((INDEX + 1))
   done
+fi
+
+if [[ -n "$ENHANCED_FILE" ]]; then
+  rm "$ENHANCED_FILE"
 fi
 
 echo "Done. Split into $((INDEX - 1)) parts."

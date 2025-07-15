@@ -147,6 +147,12 @@ def audio_split():
     except ValueError:
         return jsonify({"error": "Invalid padding"}), 400
 
+    # Enhancement options
+    enhance = request.form.get("enhance", "false").lower() in ("1", "true", "yes")
+    enhance_speech = request.form.get("enhance_speech", "false").lower() in ("1", "true", "yes")
+    if enhance and enhance_speech:
+        return jsonify({"error": "Cannot use both enhance and enhance_speech simultaneously"}), 400
+
     # 2) Save upload to shared input folder
     job_id = str(uuid.uuid4())
     input_dir = "/shared/audio/in"
@@ -160,7 +166,7 @@ def audio_split():
 
     # 3) Call the split script
     cmd = [
-        "/scripts/split-audio.sh",
+        "/scripts/audio-split.sh",
         "--mode", mode,
         "--chunk-length", str(chunk_length),
         "--input", input_path,
@@ -173,6 +179,12 @@ def audio_split():
             "--silence-threshold", str(silence_threshold),
             "--padding", str(padding)
         ]
+
+    # Append enhancement flags
+    if enhance_speech:
+        cmd.append("--enhance-speech")
+    elif enhance:
+        cmd.append("--enhance")
 
     try:
         subprocess.run(cmd, check=True)
@@ -194,7 +206,7 @@ def audio_split():
 
     # 6) Return the zip
     return send_file(zip_path, mimetype="application/zip", as_attachment=True,
-                     download_name=f"split-audio-{job_id}.zip")
+                     download_name=f"audio-split-{job_id}.zip")
 
 if __name__ == "__main__":
     # Starte den Server auf Port 5656 (intern)
