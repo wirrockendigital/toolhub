@@ -116,28 +116,38 @@ else
   # Silence-based splitting
   TMP_SILENCE=$(mktemp)
   echo "Detecting silence (threshold=${SILENCE_THRESHOLD}dB, min_duration=${SILENCE_DURATION}s) up to ${CHUNK_LENGTH}s with seek window ${SILENCE_SEEK}s"
-  run_and_log ffmpeg -i "$INPUT_FILE" -af silencedetect=noise=-${SILENCE_THRESHOLD}dB:d=${SILENCE_DURATION} -f null - 2> "$TMP_SILENCE" \
+  run_and_log ffmpeg -i "$INPUT_FILE" -af silencedetect=noise=${SILENCE_THRESHOLD}dB:d=${SILENCE_DURATION} -f null - 2> "$TMP_SILENCE" \
     || { echo "Error during silence detection" >&2; rm "$TMP_SILENCE"; exit 1; }
 
-  SPLIT_POINTS=()
-  NEXT_SPLIT="$CHUNK_LENGTH"
-
+  # Collect all silence_end timestamps
+  SILENCE_TIMES=()
   while read -r LINE; do
     if [[ "$LINE" =~ silence_end: ]]; then
       TIME=$(echo "$LINE" | grep -oP 'silence_end: \K[0-9\.]+')
-      # Check if TIME falls within [NEXT_SPLIT - SILENCE_SEEK, NEXT_SPLIT]
-      LOWER=$(echo "$NEXT_SPLIT - $SILENCE_SEEK" | bc)
-      if (( $(echo "$TIME <= $NEXT_SPLIT" | bc -l) )) && (( $(echo "$TIME >= $LOWER" | bc -l) )); then
-        CUT_POINT=$(echo "$TIME - $PADDING" | bc)
-        (( $(echo "$CUT_POINT < 0" | bc -l) )) && CUT_POINT=0
-        SPLIT_POINTS+=("$CUT_POINT")
-        NEXT_SPLIT=$(echo "$NEXT_SPLIT + $CHUNK_LENGTH" | bc)
-      fi
+      SILENCE_TIMES+=("$TIME")
     fi
   done < "$TMP_SILENCE"
   rm "$TMP_SILENCE"
 
-  # Ensure final end point
+  # Determine split points at each chunk boundary or nearest silence
+  SPLIT_POINTS=()
+  CURRENT=0
+  while (( $(echo "$CURRENT + $CHUNK_LENGTH < $DURATION" | bc -l) )); do
+    BOUNDARY=$(echo "$CURRENT + $CHUNK_LENGTH" | bc)
+    LOWER=$(echo "$BOUNDARY - $SILENCE_SEEK" | bc)
+    SELECTED="$BOUNDARY"
+    for T in "${SILENCE_TIMES[@]}"; do
+      if (( $(echo "$T <= $BOUNDARY" | bc -l) )) && (( $(echo "$T >= $LOWER" | bc -l) )); then
+        SELECTED="$T"
+        break
+      fi
+    done
+    CUT_POINT=$(echo "$SELECTED - $PADDING" | bc)
+    if (( $(echo "$CUT_POINT < 0" | bc -l) )); then CUT_POINT=0; fi
+    SPLIT_POINTS+=("$CUT_POINT")
+    CURRENT="$BOUNDARY"
+  done
+  # Always include end of file
   SPLIT_POINTS+=("$DURATION")
 
   for END in "${SPLIT_POINTS[@]}"; do

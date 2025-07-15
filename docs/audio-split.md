@@ -1,5 +1,3 @@
-
-
 # Audio Split
 
 A comprehensive guide to the **audio-split** functionality, covering both the standalone shell script (`audio-split.sh`) and the HTTP webhook endpoint (`/audio-split`).
@@ -8,21 +6,34 @@ A comprehensive guide to the **audio-split** functionality, covering both the st
 
 ## 1. Functionality Overview
 
-The **audio-split** feature allows you to divide large audio files into smaller segments according to one of two modes:
+The **audio-split** feature splits long audio recordings into smaller chunks using one of two modes:
 
 - **Fixed Mode (`fixed`)**  
-  Splits the input file into equal-length chunks, each up to a specified maximum duration.
+  Splits audio at exact intervals defined by `chunk_length`.
 
 - **Silence Mode (`silence`)**  
-  Splits the input into segments that are at most the given maximum length, but attempts to cut at detected silence points within a defined seek window at the end of each chunk. If no suitable silence is found, it falls back to a hard cut.
+  Attempts to split at silence near the end of each chunk window (default: 600s).
+  The script searches for silence starting at `(chunk_length - silence_seek)` up to `chunk_length`.
+  If no silence is found, it may continue beyond `chunk_length` until a suitable silence is detected.
 
-Key parameters for both modes:
+Silence parameters:
+- `chunk_length` (seconds): Target maximum length of each chunk.
+- `silence_seek` (seconds): Defines a window of ±`silence_seek` seconds around each `chunk_length` point to search for silence (e.g. 60 means search from 540s to 660s).
+- `silence_duration` (seconds): Minimum detected silence length to trigger a cut.
+- `silence_threshold` (dB): Volume level below which audio is considered silence. Lower values (e.g. -40 dB) are stricter and only detect very quiet audio as silence. Higher values (e.g. -15 dB) are more lenient and may detect louder audio with background noise as silence.
+- `padding` (seconds): Seconds to subtract before cut point to preserve some leading context.
 
-- `chunk_length` (seconds): Maximum duration for each segment.
-- `silence_seek` (seconds): How many seconds before the chunk end to look for silence (only for `silence` mode).
-- `silence_duration` (seconds): Minimum duration of silence to trigger a cut (only for `silence` mode).
-- `silence_threshold` (dB): Volume threshold under which audio is considered silence (optional for `silence` mode).
-- `padding` (seconds): Amount of time to include before the detected silence point (optional for `silence` mode).
+Example usage:
+
+/scripts/audio-split.sh \
+  --mode silence \
+  --chunk-length 600 \
+  --input myfile.m4a \
+  --output '' \
+  --silence-seek 60 \
+  --silence-duration 0.5 \
+  --silence-threshold -30 \
+  --padding 0.5
 
 ---
 
@@ -69,31 +80,30 @@ audio-split.sh \
 
 ### 2.4. Examples
 
-- **Fixed mode, 5-minute segments:**
+- **Fixed mode – 10-minute segments:**
 
   ```bash
   audio-split.sh \
     --mode fixed \
-    --chunk-length 300 \
-    --input /shared/audio/in/lecture.mp3
+    --chunk-length 600 \
+    --input /shared/audio/in/session.m4a
   ```
 
-- **Silence mode, up to 10-minute segments, seek 120s for silence ≥1.5s at -30dB, keep 0.5s padding:**
+- **Silence mode – 10-minute target chunks, cut at silence 60s before each boundary:**
 
   ```bash
   audio-split.sh \
     --mode silence \
     --chunk-length 600 \
-    --input lecture.mp3 \
-    --silence-seek 120 \
-    --silence-duration 1.5 \
-    --silence-threshold 30 \
-    --padding 0.5
+    --input session.m4a \
+    --silence-seek 60 \
+    --silence-duration 0.5 \
+    --silence-threshold -30 \
+    --padding 0.2
   ```
 
-Output files will appear in:
-
-- `/shared/audio/out/<timestamp>/part_01.m4a`, `part_02.m4a`, …
+Output goes to:
+`/shared/audio/out/<timestamp>/part_01.m4a`, `part_02.m4a`, …
 
 ---
 
@@ -142,14 +152,12 @@ Make sure the container making the request is part of the same Docker network.
 
 ```bash
 curl -X POST http://NAS_IP:5656/audio-split \
-  -F "file=@/path/to/lecture.mp3" \
+  -F "file=@/path/to/session.m4a" \
   -F "mode=silence" \
   -F "chunk_length=600" \
-  -F "silence_seek=120" \
-  -F "silence_duration=1.5" \
-  -F "silence_threshold=30" \
-  -F "padding=0.5" \
+  -F "silence_seek=60" \
+  -F "silence_duration=0.5" \
+  -F "silence_threshold=-30" \
+  -F "padding=0.2" \
   --output split-results.zip
 ```
-
-This will download `split-results.zip` containing all the split audio parts.
