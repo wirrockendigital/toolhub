@@ -1,4 +1,27 @@
 #!/bin/bash
+LOGFILE="/logs/split-audio.log"
+ERROR_LOGFILE="/logs/split-audio.error.log"
+# Ensure log directories exist
+mkdir -p "$(dirname "$LOGFILE")" "$(dirname "$ERROR_LOGFILE")"
+# Initialize log files
+touch "$LOGFILE" "$ERROR_LOGFILE"
+# Redirect stdout to main log
+exec >>"$LOGFILE"
+# Redirect stderr to both main log and error log
+exec 2> >(tee -a "$LOGFILE" "$ERROR_LOGFILE" >&2)
+set -x
+# Trap errors: log any failed command with timestamp, line number and exit status
+trap 'echo "[$(date)] ERROR in $0 at line $LINENO: \"$BASH_COMMAND\" exited with status $?." >> "$ERROR_LOGFILE"' ERR
+echo "==== $(date) ===="
+run_and_log() {
+  echo "[$(date)] Running: $*"
+  "$@"
+  status=$?
+  if [[ $status -ne 0 ]]; then
+    echo "[$(date)] Command failed ($status): $*" >&2
+  fi
+  return $status
+}
 # audio-split.sh - Split audio files in fixed or silence-based chunks
 # Usage:
 #   ./audio-split.sh --mode fixed|silence --chunk-length <seconds> --input <file> [--output <dir>] [--silence-seek <seconds>] [--silence-duration <seconds>] [--silence-threshold <dB>] [--padding <seconds>]
@@ -84,7 +107,8 @@ if [[ "$MODE" == "fixed" ]]; then
     DURATION_PART=$(echo "$END - $START" | bc)
     OUTFILE=$(printf "%s/part_%02d.m4a" "$OUTPUT_DIR" "$INDEX")
     echo "Exporting $OUTFILE (start=$START, duration=$DURATION_PART)"
-    ffmpeg -y -i "$INPUT_FILE" -ss "$START" -t "$DURATION_PART" "$OUTFILE" || { echo "Error splitting $OUTFILE"; exit 1; }
+    run_and_log ffmpeg -y -i "$INPUT_FILE" -ss "$START" -t "$DURATION_PART" "$OUTFILE" \
+      || { echo "Error splitting $OUTFILE" >&2; exit 1; }
     START="$END"
     INDEX=$((INDEX + 1))
   done
@@ -92,7 +116,8 @@ else
   # Silence-based splitting
   TMP_SILENCE=$(mktemp)
   echo "Detecting silence (threshold=${SILENCE_THRESHOLD}dB, min_duration=${SILENCE_DURATION}s) up to ${CHUNK_LENGTH}s with seek window ${SILENCE_SEEK}s"
-  ffmpeg -i "$INPUT_FILE" -af silencedetect=noise=-${SILENCE_THRESHOLD}dB:d=${SILENCE_DURATION} -f null - 2> "$TMP_SILENCE" || { echo "Error during silence detection"; rm "$TMP_SILENCE"; exit 1; }
+  run_and_log ffmpeg -i "$INPUT_FILE" -af silencedetect=noise=-${SILENCE_THRESHOLD}dB:d=${SILENCE_DURATION} -f null - 2> "$TMP_SILENCE" \
+    || { echo "Error during silence detection" >&2; rm "$TMP_SILENCE"; exit 1; }
 
   SPLIT_POINTS=()
   NEXT_SPLIT="$CHUNK_LENGTH"
@@ -119,7 +144,8 @@ else
     DURATION_PART=$(echo "$END - $START" | bc)
     OUTFILE=$(printf "%s/part_%02d.m4a" "$OUTPUT_DIR" "$INDEX")
     echo "Exporting $OUTFILE (start=$START, duration=$DURATION_PART)"
-    ffmpeg -y -i "$INPUT_FILE" -ss "$START" -t "$DURATION_PART" "$OUTFILE" || { echo "Error splitting $OUTFILE"; exit 1; }
+    run_and_log ffmpeg -y -i "$INPUT_FILE" -ss "$START" -t "$DURATION_PART" "$OUTFILE" \
+      || { echo "Error splitting $OUTFILE" >&2; exit 1; }
     START="$END"
     INDEX=$((INDEX + 1))
   done
