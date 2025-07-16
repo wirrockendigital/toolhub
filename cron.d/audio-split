@@ -5,5 +5,5 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 0 3 * * * toolhubuser cd /shared && \
   for f in audio/in/*.m4a; do \
     [ -f "$f" ] && job=$(basename "$f" .m4a) && \
-    /scripts/split-audio.sh "$f" "audio/out/$job"; \
+    /scripts/audio-split.sh "$f" "audio/out/$job"; \
   done

@@ -146,7 +146,7 @@ ssh toolhubuser@<NAS-IP> -p 22
 
 ### Predefined Scripts
 
-- `/scripts/split-audio.sh input.m4a audio/out/jobname`  
+- `/scripts/audio-split.sh input.m4a audio/out/jobname`
 - Add additional scripts to `/volume1/docker/toolhub/scripts`.
 
 ### Webhook API
@@ -172,7 +172,7 @@ ssh toolhubuser@<NAS-IP> -p 22
   # Daily audio-split at 03:00
   0 3 * * * toolhubuser cd /shared && \
     for f in audio/in/*.m4a; do \
-      [ -f "$f" ] && /scripts/split-audio.sh "$f" "audio/out/$(basename "$f" .m4a)"; \
+      [ -f "$f" ] && /scripts/audio-split.sh "$f" "audio/out/$(basename "$f" .m4a)"; \
     done
   ```
 
@@ -188,7 +188,7 @@ ssh toolhubuser@<NAS-IP> -p 22
 ├── conf/
 │   └── .env
 ├── scripts/
-│   ├── split-audio.sh
+│   ├── audio-split.sh
 │   └── webhook.py
 ├── cron.d/
 │   └── split-audio
