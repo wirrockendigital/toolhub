@@ -161,6 +161,25 @@ ssh toolhubuser@<NAS-IP> -p 22
   ```
 - Response JSON includes `stdout`, `stderr`, `cmd`, and `error` fields.
 
+### Audio Split API
+
+- Send an HTTP POST to `http://<NAS-IP>:5656/audio-split`
+- Form-data parameters:
+  - `file` — audio file to split
+  - `mode` — `fixed` or `silence`
+  - `chunk_length` — length of each chunk in seconds
+  - `silence_seek`, `silence_duration`, `silence_threshold`, `padding` — optional silence-detection settings for `silence` mode
+  - `enhance` — apply basic enhancement filters
+  - `enhance_speech` — apply speech-optimized filters (mutually exclusive with `enhance`)
+- The endpoint returns a ZIP file with the generated chunks.
+- Example:
+  ```bash
+  curl -X POST http://<NAS-IP>:5656/audio-split \
+    -F "file=@/path/to/audio.m4a" \
+    -F "mode=fixed" \
+    -F "chunk_length=30"
+  ```
+
 ### Cron Jobs
 
 - Place cron files in `/volume1/docker/toolhub/cron.d` (e.g., `split-audio`).  
