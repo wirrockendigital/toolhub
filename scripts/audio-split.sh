@@ -1,27 +1,16 @@
 #!/bin/bash
+set -euo pipefail
 LOGFILE="/logs/split-audio.log"
-ERROR_LOGFILE="/logs/split-audio.error.log"
 # Ensure log directories exist
-mkdir -p "$(dirname "$LOGFILE")" "$(dirname "$ERROR_LOGFILE")"
+mkdir -p "$(dirname "$LOGFILE")"
 # Initialize log files
-touch "$LOGFILE" "$ERROR_LOGFILE"
-# Redirect stdout to main log
-exec >>"$LOGFILE"
-# Redirect stderr to both main log and error log
-exec 2> >(tee -a "$LOGFILE" "$ERROR_LOGFILE" >&2)
+touch "$LOGFILE"
+# Redirect stdout and stderr to main log
+exec >>"$LOGFILE" 2>&1
 set -x
 # Trap errors: log any failed command with timestamp, line number and exit status
-trap 'echo "[$(date)] ERROR in $0 at line $LINENO: \"$BASH_COMMAND\" exited with status $?." >> "$ERROR_LOGFILE"' ERR
+trap 'echo "[$(date)] ERROR in $0 at line $LINENO: \"$BASH_COMMAND\" exited with status $?." >> "$LOGFILE"' ERR
 echo "==== $(date) ===="
-run_and_log() {
-  echo "[$(date)] Running: $*"
-  "$@"
-  status=$?
-  if [[ $status -ne 0 ]]; then
-    echo "[$(date)] Command failed ($status): $*" >&2
-  fi
-  return $status
-}
 # audio-split.sh - Split audio files in fixed or silence-based chunks
 # Usage:
 #   ./audio-split.sh --mode fixed|silence --chunk-length <seconds> --input <file> [--output <dir>] [--silence-seek <seconds>] [--silence-duration <seconds>] [--silence-threshold <dB>] [--padding <seconds>] [--enhance] [--enhance-speech]
@@ -51,20 +40,20 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Ensure enhance flags are mutually exclusive
-if [[ -n "$ENHANCE" && -n "$ENHANCE_SPEECH" ]]; then
+if [[ -n "${ENHANCE-}" && -n "${ENHANCE_SPEECH-}" ]]; then
   echo "Error: --enhance and --enhance-speech cannot be used together" >&2
   exit 1
 fi
 
 # Validate required parameters
-if [[ -z "$MODE" || -z "$CHUNK_LENGTH" || -z "$INPUT_PATH" ]]; then
+if [[ -z "${MODE-}" || -z "${CHUNK_LENGTH-}" || -z "${INPUT_PATH-}" ]]; then
   echo "Usage: $0 --mode fixed|silence --chunk-length <seconds> --input <file> [--output <dir>] [--silence-seek <seconds>] [--silence-duration <seconds>] [--silence-threshold <dB>] [--padding <seconds>] [--enhance] [--enhance-speech]"
   exit 1
 fi
 
 # Silence mode requires extra parameters
 if [[ "$MODE" == "silence" ]]; then
-  if [[ -z "$SILENCE_SEEK" || -z "$SILENCE_DURATION" ]]; then
+  if [[ -z "${SILENCE_SEEK-}" || -z "${SILENCE_DURATION-}" ]]; then
     echo "For silence mode, --silence-seek and --silence-duration are required"
     exit 1
   fi
@@ -80,22 +69,22 @@ else
 fi
 
 # Preprocess audio with optional filters
-if [[ "$ENHANCE_SPEECH" == "1" ]]; then
+if [[ "${ENHANCE_SPEECH-}" == "1" ]]; then
   FILTERS="highpass=f=80, lowpass=f=4000, equalizer=f=1000:width_type=o:width=2:g=6, afftdn"
-elif [[ "$ENHANCE" == "1" ]]; then
+elif [[ "${ENHANCE-}" == "1" ]]; then
   FILTERS="highpass=f=100, lowpass=f=3000, afftdn"
 fi
 
-if [[ -n "$FILTERS" ]]; then
+if [[ -n "${FILTERS-}" ]]; then
   echo "Enhancing audio: setting mono, 16kHz, 64k bitrate, filters [$FILTERS]"
   ENHANCED_FILE=$(mktemp --suffix ".m4a")
-  run_and_log ffmpeg -y -i "$INPUT_FILE" -ar 16000 -ac 1 -b:a 64k -af "$FILTERS" "$ENHANCED_FILE" \
-    || { echo "Error enhancing audio" >&2; exit 1; }
+  echo "Running: ffmpeg -y -i \"$INPUT_FILE\" -ar 16000 -ac 1 -b:a 64k -af \"$FILTERS\" \"$ENHANCED_FILE\""
+  ffmpeg -y -i "$INPUT_FILE" -ar 16000 -ac 1 -b:a 64k -af "$FILTERS" "$ENHANCED_FILE" || { echo "Error enhancing audio" >&2; exit 1; }
   INPUT_FILE="$ENHANCED_FILE"
 fi
 
 # Determine output directory
-if [[ -n "$OUTPUT_DIR_ARG" ]]; then
+if [[ -n "${OUTPUT_DIR_ARG-}" ]]; then
   if [[ "$OUTPUT_DIR_ARG" != /* ]]; then
     OUTPUT_DIR="$BASE_OUT_DIR/$OUTPUT_DIR_ARG"
   else
@@ -130,8 +119,8 @@ if [[ "$MODE" == "fixed" ]]; then
     DURATION_PART=$(echo "$END - $START" | bc)
     OUTFILE=$(printf "%s/part_%02d.m4a" "$OUTPUT_DIR" "$INDEX")
     echo "Exporting $OUTFILE (start=$START, duration=$DURATION_PART)"
-    run_and_log ffmpeg -y -i "$INPUT_FILE" -ss "$START" -t "$DURATION_PART" "$OUTFILE" \
-      || { echo "Error splitting $OUTFILE" >&2; exit 1; }
+    echo "Running: ffmpeg -y -i \"$INPUT_FILE\" -ss \"$START\" -t \"$DURATION_PART\" \"$OUTFILE\""
+    ffmpeg -y -i "$INPUT_FILE" -ss "$START" -t "$DURATION_PART" "$OUTFILE" || { echo "Error splitting $OUTFILE" >&2; exit 1; }
     START="$END"
     INDEX=$((INDEX + 1))
   done
@@ -139,8 +128,8 @@ else
   # Silence-based splitting
   TMP_SILENCE=$(mktemp)
   echo "Detecting silence (threshold=${SILENCE_THRESHOLD}dB, min_duration=${SILENCE_DURATION}s) up to ${CHUNK_LENGTH}s with seek window ${SILENCE_SEEK}s"
-  run_and_log ffmpeg -i "$INPUT_FILE" -af silencedetect=noise=${SILENCE_THRESHOLD}dB:d=${SILENCE_DURATION} -f null - 2> "$TMP_SILENCE" \
-    || { echo "Error during silence detection" >&2; rm "$TMP_SILENCE"; exit 1; }
+  echo "Running: ffmpeg -i \"$INPUT_FILE\" -af silencedetect=noise=${SILENCE_THRESHOLD}dB:d=${SILENCE_DURATION} -f null -"
+  ffmpeg -i "$INPUT_FILE" -af silencedetect=noise=${SILENCE_THRESHOLD}dB:d=${SILENCE_DURATION} -f null - 2> "$TMP_SILENCE" || { echo "Error during silence detection" >&2; rm "$TMP_SILENCE"; exit 1; }
 
   # Collect all silence_end timestamps
   SILENCE_TIMES=()
@@ -177,15 +166,22 @@ else
     DURATION_PART=$(echo "$END - $START" | bc)
     OUTFILE=$(printf "%s/part_%02d.m4a" "$OUTPUT_DIR" "$INDEX")
     echo "Exporting $OUTFILE (start=$START, duration=$DURATION_PART)"
-    run_and_log ffmpeg -y -i "$INPUT_FILE" -ss "$START" -t "$DURATION_PART" "$OUTFILE" \
-      || { echo "Error splitting $OUTFILE" >&2; exit 1; }
+    echo "Running: ffmpeg -y -i \"$INPUT_FILE\" -ss \"$START\" -t \"$DURATION_PART\" \"$OUTFILE\""
+    ffmpeg -y -i "$INPUT_FILE" -ss "$START" -t "$DURATION_PART" "$OUTFILE" || { echo "Error splitting $OUTFILE" >&2; exit 1; }
     START="$END"
     INDEX=$((INDEX + 1))
   done
 fi
 
-if [[ -n "$ENHANCED_FILE" ]]; then
+# Clean up temporary enhanced file if created
+if [[ -n "${ENHANCED_FILE-}" ]]; then
   rm "$ENHANCED_FILE"
+fi
+
+# Verify that at least one output file exists
+if ! compgen -G "$OUTPUT_DIR/*.m4a" > /dev/null; then
+  echo "No audio chunks were created. Exiting with error." >&2
+  exit 1
 fi
 
 echo "Done. Split into $((INDEX - 1)) parts."
