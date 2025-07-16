@@ -1,79 +1,54 @@
-from flask import Flask, request, jsonify, send_file
-import subprocess
-import tempfile
-import os
-import zipfile
-import uuid
+# Audio Split Usage
 
-app = Flask(__name__)
+`scripts/audio-split.sh` splits an audio file into fixed-size chunks or at points of silence.
 
-@app.route('/audio-split', methods=['POST'])
-def audio_split():
-    if 'file' not in request.files:
-        return jsonify(error="No file part"), 400
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify(error="No selected file"), 400
+## Syntax
 
-    mode = request.form.get('mode')
-    chunk_length = request.form.get('chunk_length')
-    silence_seek = request.form.get('silence_seek')
-    silence_duration = request.form.get('silence_duration')
-    silence_threshold = request.form.get('silence_threshold')
-    padding = request.form.get('padding')
+```bash
+./audio-split.sh --mode fixed|silence --chunk-length <seconds> --input <file> [--output <dir>] \
+  [--silence-seek <seconds>] [--silence-duration <seconds>] [--silence-threshold <dB>] \
+  [--padding <seconds>] [--enhance] [--enhance-speech]
+```
 
-    # Enhancement flags
-    enhance = bool(request.form.get('enhance'))
-    enhance_speech = bool(request.form.get('enhance_speech'))
-    if enhance and enhance_speech:
-        return jsonify(error="`enhance` and `enhance_speech` cannot be used together"), 400
+- `--mode fixed` splits on exact intervals.
+- `--mode silence` begins each chunk on the next silence. Use `--silence-seek`, `--silence-duration`, and `--silence-threshold` to fine‑tune detection. Optional `--padding` adds silence around cuts.
+- `--chunk-length` sets the desired chunk duration.
+- `--input` is the path to the source audio file. `--output` sets the destination directory (defaults to `/shared/audio/out`).
+- `--enhance` or `--enhance-speech` apply noise‑reduction filters (mutually exclusive).
 
-    if not mode or not chunk_length:
-        return jsonify(error="Missing required parameters"), 400
+## Examples
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        input_path = os.path.join(tmpdir, 'input_audio')
-        file.save(input_path)
+Split every 30 seconds:
 
-        output_dir = os.path.join(tmpdir, 'output')
-        os.makedirs(output_dir, exist_ok=True)
+```bash
+./audio-split.sh --mode fixed --chunk-length 30 --input song.m4a
+```
 
-        cmd = [
-            '/volume1/docker/toolhub/scripts/audio-split.sh',
-            '--mode', mode,
-            '--chunk-length', chunk_length,
-            '--input', input_path,
-            '--output', output_dir
-        ]
+Split on silence, starting detection from the beginning:
 
-        if mode == 'silence':
-            if silence_seek:
-                cmd.extend(['--silence-seek', silence_seek])
-            if silence_duration:
-                cmd.extend(['--silence-duration', silence_duration])
-            if silence_threshold:
-                cmd.extend(['--silence-threshold', silence_threshold])
-            if padding:
-                cmd.extend(['--padding', padding])
+```bash
+./audio-split.sh --mode silence --chunk-length 30 --input talk.m4a \
+  --silence-seek 0 --silence-duration 0.3 --silence-threshold -30
+```
 
-        # Pass enhancement flags to the splitter script
-        if enhance_speech:
-            cmd.append('--enhance-speech')
-        elif enhance:
-            cmd.append('--enhance')
+Logs are stored in `/logs/split-audio.log`.
 
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        except subprocess.CalledProcessError as e:
-            return jsonify(error=f"Audio splitting failed: {e.stderr}"), 500
+## Usage via SSH
 
-        zip_path = os.path.join(tmpdir, 'result.zip')
-        with zipfile.ZipFile(zip_path, 'w') as zipf:
-            for root, dirs, files in os.walk(output_dir):
-                for filename in files:
-                    filepath = os.path.join(root, filename)
-                    arcname = os.path.relpath(filepath, output_dir)
-                    zipf.write(filepath, arcname)
+1. Copy your `.m4a` file into `/shared/audio/in`.
+2. Run the script inside the container:
+   ```bash
+   /scripts/audio-split.sh --mode fixed --chunk-length 30 --input myfile.m4a
+   ```
+3. Chunks are written to `/shared/audio/out/<timestamp>/`.
 
-        return send_file(zip_path, mimetype='application/zip', as_attachment=True,
-                         download_name=f"split-audio-{uuid.uuid4()}.zip")
+## Usage via Webhook
+
+Send a `POST` request to the `/audio-split` endpoint. Example using `curl`:
+
+```bash
+curl -F "file=@myfile.m4a" -F "mode=fixed" -F "chunk_length=30" \
+     http://<toolhub-ip>:5656/audio-split -o audio-split.zip
+```
+
+The endpoint returns a ZIP archive containing the split audio files.
