@@ -5,10 +5,13 @@
 : "${TOOLHUB_PASSWORD:=toolhub123}"
 : "${TOOLHUB_UID:=1061}"
 : "${TOOLHUB_GID:=100}"
-GROUP_NAME="users"
 
-# Use system group 'users', assume it exists (Debian default)
-GROUP_NAME="users"
+# Determine group name for TOOLHUB_GID
+GROUP_NAME="$(getent group "$TOOLHUB_GID" | cut -d: -f1)"
+if [[ -z "$GROUP_NAME" ]]; then
+  GROUP_NAME="toolhub"
+  groupadd -g "$TOOLHUB_GID" "$GROUP_NAME"
+fi
 
 # Create user if it doesn't exist
 if ! id -u "$TOOLHUB_USER" >/dev/null 2>&1; then
