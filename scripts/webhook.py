@@ -199,10 +199,14 @@ def audio_split():
         # Execute the split script with a 10-minute timeout to prevent hanging
         subprocess.run(cmd, check=True, timeout=600)
         logger.info(f"Split script finished successfully for job {job_id}")
-        if not any(fname.endswith(('.mp3', '.m4a', '.wav')) for fname in os.listdir(output_dir)):
-            logger.error(f"No audio chunks were generated for job {job_id} in {output_dir}")
+        audio_files = [f for f in os.listdir(output_dir)
+                       if f.endswith(('.mp3', '.m4a', '.wav'))]
+        if not audio_files:
+            logger.error(
+                f"No audio chunks were generated for job {job_id} in {output_dir}")
+            return jsonify({"error": "No audio chunks were generated"}), 500
         else:
-            logger.info(f"Audio chunks generated: {os.listdir(output_dir)}")
+            logger.info(f"Audio chunks generated: {audio_files}")
     except subprocess.TimeoutExpired as e:
         logger.exception(f"Split script timed out after 600s")
         return jsonify({"error": "Audio split timed out", "detail": str(e)}), 504
