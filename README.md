@@ -55,7 +55,7 @@ Eric
 > - TOOLHUB_USER=toolhubuser
 > - TOOLHUB_PASSWORD=toolhub123
 > - TOOLHUB_UID=1061
-- TOOLHUB_GID=100
+> - TOOLHUB_GID=100
 >
 > These values can be modified in Portainer after uploading the `stack.env`
 
