@@ -16,7 +16,7 @@ if [[ -z "$GROUP_NAME" ]]; then
     groupadd -g "$TOOLHUB_GID" "$GROUP_NAME"
   fi
 fi
-
+ ´
 # Create user if it doesn't exist
 if ! id -u "$TOOLHUB_USER" >/dev/null 2>&1; then
   useradd -u "$TOOLHUB_UID" -g "$GROUP_NAME" -s /bin/bash -d /workspace "$TOOLHUB_USER"
