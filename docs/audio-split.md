@@ -2,6 +2,8 @@
 
 `scripts/audio-split.sh` splits an audio file into fixed-size chunks or at points of silence.
 
+**Dependencies:** `ffmpeg`, `ffprobe`, and `bc` must be available in the PATH.
+
 ## Syntax
 
 ```bash
