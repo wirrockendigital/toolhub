@@ -1,6 +1,6 @@
 #!/bin/bash
 set -euo pipefail
-LOGFILE="/logs/split-audio.log"
+LOGFILE="/logs/audio-split.log"
 # Ensure log directories exist
 mkdir -p "$(dirname "$LOGFILE")"
 # Initialize log files
