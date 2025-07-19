@@ -33,7 +33,8 @@ Example usage:
   --silence-seek 60 \
   --silence-duration 0.5 \
   --silence-threshold -30 \
-  --padding 0.5
+  --padding 0.5 \
+  --enhance-speech
 
 ---
 
@@ -69,7 +70,8 @@ audio-split.sh \
   [--silence-seek <seconds>] \
   [--silence-duration <seconds>] \
   [--silence-threshold <dB>] \
-  [--padding <seconds>]
+  [--padding <seconds>] \
+  [--enhance] [--enhance-speech]
 ```
 
 - **`--mode`**: `fixed` or `silence`.
@@ -77,6 +79,18 @@ audio-split.sh \
 - **`--input`**: Path to the source audio file (absolute or relative to `/shared/audio/in`).
 - **`--output`**: (Optional) Subdirectory under `/shared/audio/out` for this run. Defaults to a timestamp directory.
 - Silence-specific flags (`--silence-seek`, `--silence-duration`, `--silence-threshold`, `--padding`) apply only when `--mode silence`.
+
+### 2.3.1 Audio Enhancement Options
+
+In addition to splitting modes, the script supports optional audio enhancement to improve transcription quality for ASR systems like Whisper:
+
+- `--enhance`  
+  Preprocesses input audio by converting to mono, resampling to 16 kHz, setting bitrate to 64 k, and applying noise reduction filters (`highpass=f=100, lowpass=f=3000, afftdn`). This reduces background noise and improves clarity.
+
+- `--enhance-speech`  
+  Preprocesses input audio by converting to mono, resampling to 16 kHz, setting bitrate to 64 k, and applying speech-focused filters (`highpass=f=80, lowpass=f=4000, equalizer=f=1000:width_type=o:width=2:g=6, afftdn`). This boosts voice frequencies and highlights speech.
+
+Both options optimize audio for automatic speech recognition by matching Whisper’s recommended input format and improving signal-to-noise ratio, leading to more accurate and reliable transcriptions.
 
 ### 2.4. Examples
 
@@ -161,3 +175,37 @@ curl -X POST http://NAS_IP:5656/audio-split \
   -F "padding=0.2" \
   --output split-results.zip
 ```
+
+### 2.5 SSH Usage
+
+You can also execute the `audio-split.sh` script remotely via SSH. Make sure your audio file is already placed in the shared input directory (`/shared/audio/in/`).
+
+- **From a macOS host (outside Docker)**, connect to your NAS by IP:
+  ```bash
+  ssh toolhubuser@NAS_IP \
+    "/scripts/audio-split.sh \
+      --mode silence \
+      --chunk-length 600 \
+      --input myfile.m4a \
+      --output '' \
+      --silence-seek 60 \
+      --silence-duration 0.5 \
+      --silence-threshold -30 \
+      --padding 0.5 \
+      --enhance-speech"
+  ```
+
+- **From another container on the same Docker network** (e.g., n8n), use the Toolhub service hostname or internal IP:
+  ```bash
+  ssh toolhubuser@toolhub \
+    "/scripts/audio-split.sh \
+      --mode silence \
+      --chunk-length 600 \
+      --input myfile.m4a \
+      --output '' \
+      --silence-seek 60 \
+      --silence-duration 0.5 \
+      --silence-threshold -30 \
+      --padding 0.5 \
+      --enhance-speech"
+  ```
