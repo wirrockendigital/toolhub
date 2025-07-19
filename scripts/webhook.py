@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-from flask import Flask, request, jsonify, send_file, after_this_request
+from flask import Flask, request, jsonify
 import subprocess
 import logging
 import os
 from werkzeug.utils import secure_filename
 import uuid
-import zipfile
-import shutil
 
 # Define size units
 KB = 1024
@@ -23,10 +21,11 @@ os.makedirs(LOG_DIR, exist_ok=True)
 # Configure logger
 logging.basicConfig(
     filename=os.path.join(LOG_DIR, 'webhook.log'),
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s %(levelname)s %(name)s: %(message)s'
 )
 logger = logging.getLogger(__name__)
+logger.debug(f"Environment variables: {dict(os.environ)}")
 
 
 app = Flask(__name__)
@@ -93,6 +92,8 @@ def run_tool():
         })
     except subprocess.CalledProcessError as e:
         logger.error(f"Error running {cmd}: {e}")
+        logger.exception(f"Error running {cmd}: {e}")
+        logger.debug(f"CalledProcessError details: returncode={e.returncode}")
         return jsonify({
             "cmd": cmd,
             "error": str(e),
@@ -114,24 +115,23 @@ def test():
 # --- AUDIO SPLIT ENDPOINT ---
 @app.route("/audio-split", methods=["POST"])
 def audio_split():
-    # Log request parameters
-    logger.info(f"Audio split request: mode={request.form.get('mode')}, chunk_length={request.form.get('chunk_length')}, "
-                f"silence_seek={request.form.get('silence_seek')}, silence_duration={request.form.get('silence_duration')}, "
-                f"silence_threshold={request.form.get('silence_threshold')}, padding={request.form.get('padding')}")
+    # Parse JSON payload
+    data = request.get_json(force=True)
 
-    # 1) Receive file and parameters
-    file = request.files.get("file")
-    if not file:
-        return jsonify({"error": "No audio file uploaded"}), 400
+    # 1) Resolve existing shared-file path
+    filename = secure_filename(data.get("filename", ""))
+    if not filename:
+        return jsonify({"error": "No filename provided"}), 400
 
-    # Check if filename is present and secure it
-    if not file.filename:
-        return jsonify({"error": "Uploaded file has no filename"}), 400
-    filename = secure_filename(file.filename)
+    input_dir = "/shared/audio/in"
+    input_path = os.path.join(input_dir, filename)
+    if not os.path.isfile(input_path):
+        return jsonify({"error": f"Input file not found: {input_path}"}), 404
+    logger.info(f"Using shared input file: {input_path}")
 
-    mode = request.form.get("mode")
+    mode = data.get("mode")
     try:
-        chunk_length = int(request.form.get("chunk_length", 0))
+        chunk_length = int(data.get("chunk_length", 0))
     except ValueError:
         return jsonify({"error": "Invalid chunk_length"}), 400
 
@@ -140,37 +140,31 @@ def audio_split():
         return jsonify({"error": "mode must be 'fixed' or 'silence'"}), 400
 
     # Silence-specific parameters
-    silence_seek = int(request.form.get("silence_seek", 0)) if mode == "silence" else 0
+    silence_seek = int(data.get("silence_seek", 0)) if mode == "silence" else 0
     try:
-        silence_duration = float(request.form.get("silence_duration", 0.0)) if mode == "silence" else 0.0
+        silence_duration = float(data.get("silence_duration", 0.0)) if mode == "silence" else 0.0
     except ValueError:
         return jsonify({"error": "Invalid silence_duration"}), 400
     try:
-        silence_threshold = float(request.form.get("silence_threshold", 0.0)) if mode == "silence" else 0.0
+        silence_threshold = float(data.get("silence_threshold", 0.0)) if mode == "silence" else 0.0
     except ValueError:
         return jsonify({"error": "Invalid silence_threshold"}), 400
     try:
-        padding = float(request.form.get("padding", 0.0)) if mode == "silence" else 0.0
+        padding = float(data.get("padding", 0.0)) if mode == "silence" else 0.0
     except ValueError:
         return jsonify({"error": "Invalid padding"}), 400
 
-    logger.info(f"Enhance={request.form.get('enhance', 'false').lower() in ('1', 'true', 'yes')}, Enhance_speech={request.form.get('enhance_speech', 'false').lower() in ('1', 'true', 'yes')}")
-
-    # Enhancement options
-    enhance = request.form.get("enhance", "false").lower() in ("1", "true", "yes")
-    enhance_speech = request.form.get("enhance_speech", "false").lower() in ("1", "true", "yes")
+    enhance = str(data.get("enhance", "false")).lower() in ("1", "true", "yes")
+    enhance_speech = str(data.get("enhance_speech", "false")).lower() in ("1", "true", "yes")
+    logger.info(f"Enhance={enhance}, Enhance_speech={enhance_speech}")
     if enhance and enhance_speech:
         return jsonify({"error": "Cannot use both enhance and enhance_speech simultaneously"}), 400
 
-    # 2) Save uploaded file to shared input folder
+    # 2) Prepare output directory
     job_id = str(uuid.uuid4())
-    input_dir = "/shared/audio/in"
     output_dir = f"/shared/audio/out/{job_id}"
-    os.makedirs(input_dir, exist_ok=True)
     os.makedirs(output_dir, exist_ok=True)
-
-    input_path = os.path.join(input_dir, filename)
-    file.save(input_path)
+    logger.info(f"Created output directory: {output_dir}")
 
     # 3) Call the split script with appropriate arguments
     cmd = [
@@ -195,10 +189,13 @@ def audio_split():
         cmd.append("--enhance")
 
     try:
-        logger.info(f"Calling script with command: {' '.join(cmd)}")
+        logger.debug("Executing split script with command arguments:")
+        for index, arg in enumerate(cmd):
+            logger.debug(f"  cmd[{index}] = {arg}")
+        logger.info(f"Starting external script: {' '.join(cmd)}")
         # Execute the split script with a 10-minute timeout to prevent hanging
         subprocess.run(cmd, check=True, timeout=600)
-        logger.info(f"Split script finished successfully for job {job_id}")
+        logger.info(f"Split script returned with exit code 0 for job {job_id}")
         audio_files = [f for f in os.listdir(output_dir)
                        if f.endswith(('.mp3', '.m4a', '.wav'))]
         if not audio_files:
@@ -209,11 +206,13 @@ def audio_split():
             logger.info(f"Audio chunks generated: {audio_files}")
     except subprocess.TimeoutExpired as e:
         logger.exception(f"Split script timed out after 600s")
+        logger.debug(f"Timeout exception details: {e}")
         return jsonify({"error": "Audio split timed out", "detail": str(e)}), 504
     except subprocess.CalledProcessError as e:
         logger.exception("Error running split script")
         logger.error(f"STDOUT: {e.stdout}")
         logger.error(f"STDERR: {e.stderr}")
+        logger.debug(f"CalledProcessError details: returncode={e.returncode}")
         log_tail = ""
         try:
             with open("/logs/audio-split.log", "r") as log_f:
@@ -227,31 +226,12 @@ def audio_split():
             "log_tail": log_tail,
         }), 500
 
-    zip_path = f"/shared/audio/out/{job_id}.zip"
-    logger.info(f"Zipping output directory {output_dir} into {zip_path}")
-    # 4) Zip the results from the output folder
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        for root, dirs, files in os.walk(output_dir):
-            for f_name in files:
-                file_path = os.path.join(root, f_name)
-                arcname = os.path.relpath(file_path, output_dir)
-                zf.write(file_path, arcname)
-
-    # 5) Schedule cleanup of the output folder and zip file after sending the response
-    @after_this_request
-    def cleanup(response):
-        try:
-            logger.info(f"Cleaning up job {job_id} resources: {output_dir}, {zip_path}")
-            shutil.rmtree(output_dir)
-            os.remove(zip_path)
-            logger.info(f"Cleaned up output: {output_dir} and zip: {zip_path}")
-        except Exception as cleanup_error:
-            logger.warning(f"Cleanup failed: {cleanup_error}")
-        return response
-
-    # 6) Return the zip file as a downloadable attachment
-    return send_file(zip_path, mimetype="application/zip", as_attachment=True,
-                     download_name=f"audio-split-{job_id}.zip")
+    # Return the job ID and list of generated files
+    return jsonify({
+        "job_id": job_id,
+        "output_dir": output_dir,
+        "files": audio_files
+    }), 200
 
 if __name__ == "__main__":
     # Start the server on port 5656 (internal)
