@@ -214,7 +214,18 @@ def audio_split():
         logger.exception("Error running split script")
         logger.error(f"STDOUT: {e.stdout}")
         logger.error(f"STDERR: {e.stderr}")
-        return jsonify({"error": str(e), "stdout": e.stdout, "stderr": e.stderr}), 500
+        log_tail = ""
+        try:
+            with open("/logs/audio-split.log", "r") as log_f:
+                log_tail = "".join(log_f.readlines()[-20:])
+        except Exception as log_err:
+            log_tail = f"Failed to read log: {log_err}"
+        return jsonify({
+            "error": str(e),
+            "stdout": e.stdout,
+            "stderr": e.stderr,
+            "log_tail": log_tail,
+        }), 500
 
     zip_path = f"/shared/audio/out/{job_id}.zip"
     logger.info(f"Zipping output directory {output_dir} into {zip_path}")

@@ -11,6 +11,13 @@ set -x
 # Trap errors: log any failed command with timestamp, line number and exit status
 trap 'echo "[$(date)] ERROR in $0 at line $LINENO: \"$BASH_COMMAND\" exited with status $?." >> "$LOGFILE"' ERR
 echo "==== $(date) ===="
+# Verify required tools are available before continuing
+for cmd in ffmpeg ffprobe bc; do
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "Error: required command '$cmd' not found" >&2
+    exit 1
+  fi
+done
 # audio-split.sh - Split audio files in fixed or silence-based chunks
 # Usage:
 #   ./audio-split.sh --mode fixed|silence --chunk-length <seconds> --input <file> [--output <dir>] [--silence-seek <seconds>] [--silence-duration <seconds>] [--silence-threshold <dB>] [--padding <seconds>] [--enhance] [--enhance-speech]
