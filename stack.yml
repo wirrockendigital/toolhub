@@ -20,12 +20,12 @@ services:
       - /volume1/docker/toolhub/cron.d:/etc/cron.d
       - /volume1/docker/toolhub/logs:/logs
       - /volume1/docker/shared:/shared
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fs http://localhost:5656/test || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+    deploy:
+      resources:
+        reservations:
+          memory: 1G
+        limits:
+          memory: 2G
     networks:
       allmydocker-net:
         ipv4_address: 192.168.123.100
