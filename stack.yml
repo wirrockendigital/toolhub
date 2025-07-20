@@ -23,7 +23,7 @@ services:
     deploy:
       resources:
         reservations:
-          memory: 1G
+          memory: 256M
         limits:
           memory: 2G
     networks:
