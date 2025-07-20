@@ -57,8 +57,10 @@ done
 
 
 
-# Always copy default bootstrap content if not previously initialized
-if [[ ! -f /scripts/.initialized ]]; then
+#
+# Always copy default bootstrap content if not previously initialized,
+# or if /scripts is empty (e.g., new host mount).
+if [[ ! -f /scripts/.initialized || -z "$(ls -A /scripts)" ]]; then
   echo "[INIT] First-time bootstrap: copying default content..."
   cp -r "$BOOTSTRAP_SRC/scripts/." /scripts/ || exit 1
   cp -r "$BOOTSTRAP_SRC/cron.d/." /etc/cron.d/ || exit 1
