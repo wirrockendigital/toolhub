@@ -1,10 +1,22 @@
 #!/usr/bin/env python3
+"""
+Toolhub Webhook Service
+
+Exposes REST endpoints:
+  GET  /             Service info & available routes
+  GET/POST /test     Health check
+  POST /audio-split  Split audio files from /shared/audio/in
+
+Logs all activity to /logs/webhook.log.
+"""
 from flask import Flask, request, jsonify
 import subprocess
 import logging
 import os
 from werkzeug.utils import secure_filename
 import uuid
+from werkzeug.exceptions import HTTPException
+import time
 
 # Define size units
 KB = 1024
@@ -30,76 +42,47 @@ logger.debug(f"Environment variables: {dict(os.environ)}")
 
 app = Flask(__name__)
 
+# Detailed request/response logging with timing
+@app.before_request
+def log_request_start():
+    request.start_time = time.time()
+    logger.info(
+        f"Incoming request: {request.method} {request.path} "
+        f"from {request.remote_addr}, args={request.args}, json={request.get_json(silent=True)}"
+    )
+
+@app.after_request
+def log_request_end(response):
+    duration = time.time() - getattr(request, 'start_time', time.time())
+    logger.info(
+        f"Handled request: {request.method} {request.path} "
+        f"status={response.status_code} in {duration:.3f}s"
+    )
+    return response
+
 
 # Limit max JSON payload to 1 GB
 app.config['MAX_CONTENT_LENGTH'] = MAX_PAYLOAD_SIZE
 
+# Helper to centralize error logging and JSON response
+def respond_error(name, message, code=500, exc=None):
+    if exc:
+        logger.exception(name)
+    else:
+        logger.error(f"{name}: {message}")
+    return jsonify({"error": name, "message": message}), code
 
-# Allow only paths within these directories
-ALLOWED_PATH_PREFIXES = ("/workspace/", "/shared/")
-
-# List of allowed tools
-ALLOWED_TOOLS = {
-    "curl", "wget", "git", "ffmpeg", "jq", "yq",
-    "unzip", "convert", "sox", "python3", "pip3",
-    "nano", "less", "lsof", "tree", "htop", "exiftool"
-}
-
-@app.route("/run", methods=["POST"])
-def run_tool():
-    data = request.get_json(force=True)
-
-    tool = data.get("tool")
-    args = data.get("args", [])
-
-    # Basic checks
-    if not tool or not isinstance(args, list):
-        return jsonify({
-            "error": "Please provide 'tool' (string) and 'args' (list)"
-        }), 400
-
-    # Check if the tool is allowed
-    if tool not in ALLOWED_TOOLS:
-        return jsonify({
-            "error": f"Tool not allowed: {tool}"
-        }), 400
-
-    # Security check for passed paths (absolute, no traversal)
-    for a in args:
-        if ".." in a or "~" in a:
-            return jsonify({"error": f"Invalid path: {a}"}), 400
-        abs_path = os.path.abspath(a)
-        if not any(abs_path.startswith(prefix) for prefix in ALLOWED_PATH_PREFIXES):
-            return jsonify({"error": f"Invalid path: {a}"}), 400
-
-    cmd = [tool] + args
-    logger.info(f"Request for tool={tool}, args={args}")
-    logger.info(f"Executing command: {cmd}")
-
-    # Build and execute the command
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=600
-        )
-        return jsonify({
-            "cmd": cmd,
-            "stdout": result.stdout,
-            "stderr": result.stderr
-        })
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Error running {cmd}: {e}")
-        logger.exception(f"Error running {cmd}: {e}")
-        logger.debug(f"CalledProcessError details: returncode={e.returncode}")
-        return jsonify({
-            "cmd": cmd,
-            "error": str(e),
-            "stdout": e.stdout,
-            "stderr": e.stderr
-        }), 500
+@app.route("/", methods=["GET"])
+def index():
+    """Return service info with available routes."""
+    return jsonify({
+        "service": "Toolhub Webhook",
+        "endpoints": {
+            "/":           "This help message",
+            "/test":       "GET or POST health-check",
+            "/audio-split":"POST JSON {filename, mode, …} → split audio from /shared"
+        }
+    }), 200
 
 
 # --- TEST ENDPOINT ---
@@ -194,8 +177,12 @@ def audio_split():
             logger.debug(f"  cmd[{index}] = {arg}")
         logger.info(f"Starting external script: {' '.join(cmd)}")
         # Execute the split script with a 10-minute timeout to prevent hanging
-        subprocess.run(cmd, check=True, timeout=600)
-        logger.info(f"Split script returned with exit code 0 for job {job_id}")
+        start = time.time()
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=600)
+        duration = time.time() - start
+        logger.debug(f"Split script stdout: {result.stdout}")
+        logger.debug(f"Split script stderr: {result.stderr}")
+        logger.info(f"Split script returned with exit code {result.returncode} for job {job_id} in {duration:.3f}s")
         audio_files = [f for f in os.listdir(output_dir)
                        if f.endswith(('.mp3', '.m4a', '.wav'))]
         if not audio_files:
@@ -232,6 +219,16 @@ def audio_split():
         "output_dir": output_dir,
         "files": audio_files
     }), 200
+
+# Error handler for HTTP exceptions (e.g., 400, 404)
+@app.errorhandler(HTTPException)
+def handle_http_exception(e):
+    return respond_error(e.name, e.description, code=e.code, exc=e)
+
+# Global exception handler to return JSON on uncaught errors
+@app.errorhandler(Exception)
+def handle_unexpected_error(e):
+    return respond_error("Internal server error", str(e), code=500, exc=e)
 
 if __name__ == "__main__":
     # Start the server on port 5656 (internal)

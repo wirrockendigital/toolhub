@@ -58,9 +58,8 @@ done
 
 
 #
-# Always copy default bootstrap content if not previously initialized,
-# or if /scripts is empty (e.g., new host mount).
-if [[ ! -f /scripts/.initialized || -z "$(ls -A /scripts)" ]]; then
+# Copy default content if not initialized or if only .initialized exists in /scripts
+if [[ ! -f /scripts/.initialized || -z "$(ls -A /scripts | grep -v '^.initialized$')" ]]; then
   echo "[INIT] First-time bootstrap: copying default content..."
   cp -r "$BOOTSTRAP_SRC/scripts/." /scripts/ || exit 1
   cp -r "$BOOTSTRAP_SRC/cron.d/." /etc/cron.d/ || exit 1
@@ -84,4 +83,4 @@ fi
 
 # Launch webhook service with Gunicorn as toolhubuser
 echo "[INIT] Launching webhook service with Gunicorn as $TOOLHUB_USER..."
-exec su "$TOOLHUB_USER" -c "cd /scripts && exec gunicorn --bind 0.0.0.0:5656 webhook:app"
+exec su "$TOOLHUB_USER" -c "cd /scripts && exec gunicorn --timeout 600 --bind 0.0.0.0:5656 webhook:app"
