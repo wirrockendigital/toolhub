@@ -1,5 +1,11 @@
-
 #!/bin/bash
+set -euo pipefail
+
+# Enable verbose debugging if DEBUG=true
+if [[ "${DEBUG:-false}" == "true" ]]; then
+  set -x
+fi
+
 # Dynamically set user parameters from environment or defaults
 : "${TOOLHUB_USER:=toolhubuser}"
 : "${TOOLHUB_PASSWORD:=toolhub123}"
@@ -54,9 +60,9 @@ done
 # Always copy default bootstrap content if not previously initialized
 if [[ ! -f /scripts/.initialized ]]; then
   echo "[INIT] First-time bootstrap: copying default content..."
-  cp -r "$BOOTSTRAP_SRC/scripts/." /scripts/
-  cp -r "$BOOTSTRAP_SRC/cron.d/." /etc/cron.d/
-  cp -r "$BOOTSTRAP_SRC/logs/." /logs/
+  cp -r "$BOOTSTRAP_SRC/scripts/." /scripts/ || exit 1
+  cp -r "$BOOTSTRAP_SRC/cron.d/." /etc/cron.d/ || exit 1
+  cp -r "$BOOTSTRAP_SRC/logs/." /logs/ || exit 1
   touch /scripts/.initialized
 else
   echo "[INIT] /scripts already initialized – skipping bootstrap copy"
@@ -68,12 +74,12 @@ echo "[INIT] Starting SSH daemon..."
 echo "[INIT] Starting cron daemon..."
 cron &
 
-# Launch webhook service with Gunicorn as toolhubuser
-echo "[INIT] Launching webhook service with Gunicorn as $TOOLHUB_USER..."
-exec su "$TOOLHUB_USER" -c "PYTHONPATH=/scripts gunicorn --chdir /scripts --bind 0.0.0.0:5656 webhook:app"
-
 # Symlink .bashrc from /workspace/conf/.bashrc if it exists
 if [[ -f /workspace/conf/.bashrc ]]; then
   echo "[INIT] Linking .bashrc from /workspace/conf/.bashrc"
-  ln -sf /workspace/conf/.bashrc /workspace/.bashrc
+  ln -sf /workspace/conf/.bashrc /workspace/.bashrc || exit 1
 fi
+
+# Launch webhook service with Gunicorn as toolhubuser
+echo "[INIT] Launching webhook service with Gunicorn as $TOOLHUB_USER..."
+exec su "$TOOLHUB_USER" -c "cd /scripts && exec gunicorn --bind 0.0.0.0:5656 webhook:app"
