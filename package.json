@@ -1,0 +1,22 @@
+{
+  "name": "toolhub-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "mcp:dev": "tsx src/mcp/server.ts",
+    "mcp:start": "node --enable-source-maps dist/mcp/server.js",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.2.0",
+    "execa": "^8.0.1",
+    "fast-glob": "^3.3.2",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.17",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  }
+}

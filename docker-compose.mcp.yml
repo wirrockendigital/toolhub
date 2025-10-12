@@ -1,0 +1,28 @@
+version: "3.9"
+
+services:
+  toolhub-mcp:
+    image: node:20-alpine
+    container_name: toolhub-mcp
+    working_dir: /app
+    command: ["sh", "-c", "npm install --omit=dev && npm run build && npm run mcp:start"]
+    restart: unless-stopped
+    depends_on:
+      - toolhub
+    network_mode: "service:toolhub"
+    environment:
+      SAFE_MODE: '${SAFE_MODE:-true}'
+      ALLOWLIST_PATHS: '${ALLOWLIST_PATHS:-/data,/tmp}'
+      ALLOWLIST_HOSTS: '${ALLOWLIST_HOSTS:-localhost,127.0.0.1}'
+      MCP_SCRIPTS_ROOT: '${MCP_SCRIPTS_ROOT:-/app/scripts}'
+      MCP_COMMAND_TIMEOUT_MS: '${MCP_COMMAND_TIMEOUT_MS:-120000}'
+      MCP_MAX_OUTPUT: '${MCP_MAX_OUTPUT:-20000}'
+      MCP_RATE_LIMIT_COUNT: '${MCP_RATE_LIMIT_COUNT:-5}'
+      MCP_RATE_LIMIT_WINDOW_MS: '${MCP_RATE_LIMIT_WINDOW_MS:-10000}'
+      NUCLEI_TEMPLATES: '${NUCLEI_TEMPLATES:-/root/nuclei-templates}'
+    volumes:
+      - .:/app
+      - ./scripts:/app/scripts:ro
+      - ./data:/data
+      - /tmp/toolhub:/tmp
+      - /var/run/docker.sock:/var/run/docker.sock
