@@ -35,3 +35,5 @@ Thumbs.db
 # Mount-Verzeichnisse
 /shared/
 workspace/
+# Wake-on-LAN configuration (local override)
+config/wol-devices.json

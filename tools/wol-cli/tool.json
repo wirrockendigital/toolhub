@@ -1,0 +1,13 @@
+{
+  "name": "wol-cli",
+  "description": "Send a Wake-on-LAN Magic Packet to a MAC or named device.",
+  "command": "./wol-cli.sh",
+  "args": [
+    {
+      "name": "target",
+      "type": "string",
+      "description": "MAC address or device name (from config/wol-devices.json)",
+      "required": true
+    }
+  ]
+}
