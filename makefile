@@ -4,7 +4,7 @@ GHCR_REPO=ghcr.io/wirrockendigital/toolhub
 IMAGE_TAG=latest
 PLATFORM=linux/amd64
 
-.PHONY: build push run clean
+.PHONY: build push run clean wol-test
 
 build:
 	docker buildx build --platform=$(PLATFORM) \
@@ -21,3 +21,6 @@ run:
 
 clean:
 	docker rmi $(GHCR_REPO):$(IMAGE_TAG) || true
+
+wol-test:
+	./tools/wol-cli/test-wol.sh

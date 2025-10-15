@@ -1,10 +1,10 @@
-import { promises as fs, constants as fsConstants } from "node:fs";
+import { promises as fs, constants as fsConstants, Dirent } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import { McpConfig } from "./config.js";
 import { discoverScripts, ScriptToolDefinition } from "./discovery.js";
 import { RateLimiter, SecurityError, ensureHostAllowed, ensurePathAllowed } from "./security.js";
-import { DefaultArgsSchema, ToolInputSchema, normaliseArgs } from "./schemas.js";
+import { DefaultArgsSchema, JsonSchema, ToolInputSchema, normaliseArgs } from "./schemas.js";
 import { runCommand } from "./util/run.js";
 
 export interface ToolExecutionResult {
@@ -39,6 +39,22 @@ const CLI_WHITELIST: Array<{
   { name: "trivy", commands: ["trivy"], description: "Execute Trivy vulnerability scanner." },
   { name: "nuclei", commands: ["nuclei"], description: "Execute ProjectDiscovery nuclei (safe-mode restrictions apply)." },
 ];
+
+const LocalToolManifestArgSchema = z.object({
+  name: z.string(),
+  type: z.literal("string"),
+  description: z.string().optional(),
+  required: z.boolean().optional(),
+});
+
+const LocalToolManifestSchema = z.object({
+  name: z.string(),
+  description: z.string(),
+  command: z.string(),
+  args: z.array(LocalToolManifestArgSchema).default([]),
+});
+
+type LocalToolManifest = z.infer<typeof LocalToolManifestSchema>;
 
 export async function createToolRegistry(config: McpConfig): Promise<RegisteredTool[]> {
   const rateLimiter = new RateLimiter(config.rateLimitCount, config.rateLimitWindowMs);
@@ -111,6 +127,9 @@ async function createHandcraftedTools(
   scriptMap: Map<string, ScriptToolDefinition>,
 ): Promise<RegisteredTool[]> {
   const tools: RegisteredTool[] = [];
+
+  const manifestTools = await loadManifestTools(config, limiter);
+  tools.push(...manifestTools);
 
   if (await hasExecutable("pdftotext")) {
     const schema: ToolInputSchema = {
@@ -318,6 +337,110 @@ async function createHandcraftedTools(
   }
 
   return tools;
+}
+
+async function loadManifestTools(config: McpConfig, limiter: RateLimiter): Promise<RegisteredTool[]> {
+  const results: RegisteredTool[] = [];
+  const baseDir = path.resolve(process.cwd(), "tools");
+
+  let directories: Dirent[];
+  try {
+    directories = await fs.readdir(baseDir, { withFileTypes: true });
+  } catch (error) {
+    return results;
+  }
+
+  for (const entry of directories) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+
+    const manifestPath = path.join(baseDir, entry.name, "tool.json");
+    let manifest: LocalToolManifest;
+    try {
+      const raw = await fs.readFile(manifestPath, "utf8");
+      manifest = LocalToolManifestSchema.parse(JSON.parse(raw));
+    } catch (error) {
+      continue;
+    }
+
+    const commandPath = path.isAbsolute(manifest.command)
+      ? manifest.command
+      : path.resolve(baseDir, entry.name, manifest.command);
+
+    try {
+      await fs.access(commandPath, fsConstants.X_OK);
+    } catch (error) {
+      continue;
+    }
+
+    const { schema, argOrder } = buildSchemaFromManifest(manifest);
+
+    results.push({
+      name: manifest.name,
+      description: manifest.description,
+      schema,
+      handler: async (input: unknown) => {
+        limiter.check(manifest.name);
+        const parsed = schema.zod.parse(input ?? {});
+        let args: string[];
+        if (argOrder.length === 0) {
+          args = normaliseArgs((parsed as { args?: string[] }).args);
+        } else {
+          args = [];
+          for (const key of argOrder) {
+            const value = (parsed as Record<string, unknown>)[key];
+            if (value === undefined || value === null) {
+              continue;
+            }
+            args.push(String(value));
+          }
+        }
+        const result = await runCommand(manifest.name, commandPath, args, config);
+        return { ...result };
+      },
+    });
+  }
+
+  return results;
+}
+
+function buildSchemaFromManifest(manifest: LocalToolManifest): {
+  schema: ToolInputSchema;
+  argOrder: string[];
+} {
+  if (manifest.args.length === 0) {
+    return { schema: DefaultArgsSchema, argOrder: [] };
+  }
+
+  const shape: Record<string, z.ZodTypeAny> = {};
+  const properties: Record<string, JsonSchema> = {};
+  const required: string[] = [];
+
+  for (const arg of manifest.args) {
+    const description = arg.description;
+    const property: JsonSchema = { type: "string" };
+    if (description) {
+      property.description = description;
+    }
+    properties[arg.name] = property;
+    if (arg.required === false) {
+      shape[arg.name] = z.string().optional();
+    } else {
+      shape[arg.name] = z.string();
+      required.push(arg.name);
+    }
+  }
+
+  const jsonSchema: JsonSchema = { type: "object", properties };
+  if (required.length > 0) {
+    jsonSchema.required = required;
+  }
+
+  return {
+    schema: { zod: z.object(shape), json: jsonSchema },
+    argOrder: manifest.args.map((arg) => arg.name),
+  };
 }
 
 function buildCliArgsFromObject(value: Record<string, unknown>, excludedKeys: Set<string>): string[] {

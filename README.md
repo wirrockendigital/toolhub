@@ -298,6 +298,32 @@ Scripts can embed an MCP metadata block to override descriptions or JSON schemas
   ```
 - **Behavior**: Installs `node_modules` if missing, runs `npm run mcp:dev -- --list-tools`, and prints the first discovered tool (uses `jq` when present).
 
+### Wake-on-LAN (`wol-cli`)
+- **Purpose**: Send Wake-on-LAN Magic Packets to physical devices from the MCP tool runner.
+- **Setup**:
+  1. Copy `config/wol-devices.sample.json` to `config/wol-devices.json` and edit the MAC addresses for your hosts.
+  2. Optionally export `WOL_BROADCAST=192.168.123.255` (or another subnet broadcast) before starting the MCP server to override the default broadcast address.
+- **Invocation examples**:
+  ```bash
+  # Direct MAC target
+  curl -X POST http://toolhub:PORT/run \
+    -H 'Content-Type: application/json' \
+    -d '{"tool":"wol-cli","args":["3C:07:71:AA:BB:CC"]}'
+
+  # Named target resolved from config/wol-devices.json
+  curl -X POST http://toolhub:PORT/run \
+    -H 'Content-Type: application/json' \
+    -d '{"tool":"wol-cli","args":["macstudio"]}'
+  ```
+- **Networking note**: UDP broadcast from containers may require host networking. Create a `docker-compose.override.yml` with:
+  ```yaml
+  services:
+    toolhub:
+      network_mode: "host"
+  ```
+  Only enable host networking if you understand the security implications, as it exposes all container ports directly on the host.
+- **Platform reminder**: On macOS, ensure “Wake for network access” is enabled. Wake-on-LAN resumes devices from sleep/standby and does not power on machines that are fully shut down.
+
 ## Examples
 
 ### Split audio locally via CLI

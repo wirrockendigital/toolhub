@@ -52,7 +52,8 @@ RUN apt-get install -y --no-install-recommends jq                            # J
 RUN apt-get install -y --no-install-recommends yq                            # YAML processor
 RUN apt-get install -y --no-install-recommends bc                            # Command-line calculator
 
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends wakeonlan && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Fix fd symlink (fd-find on Debian/Ubuntu)
 RUN ln -s $(which fdfind) /usr/local/bin/fd
