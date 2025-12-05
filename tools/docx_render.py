@@ -18,6 +18,7 @@ from loguru import logger
 TEMPLATES_DIR = os.getenv("DOCX_TEMPLATES_DIR", "/data/templates")
 OUTPUT_DIR = os.getenv("DOCX_OUTPUT_DIR", "/data/output")
 LOG_PATH = os.getenv("DOCX_RENDER_LOG", "/logs/docx-render.log")
+LOG_LEVEL = os.getenv("DOCX_RENDER_LOG_LEVEL", "DEBUG")
 
 _logger_configured = False
 
@@ -30,7 +31,7 @@ def _configure_logger() -> None:
 
     os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
     logger.remove()
-    logger.add(LOG_PATH, level="INFO", rotation=None, retention=None)
+    logger.add(LOG_PATH, level=LOG_LEVEL, rotation=None, retention=None)
     _logger_configured = True
 
 
@@ -52,30 +53,52 @@ def _safe_filename(name: str, field: str) -> str:
     return name
 
 
-def replace_placeholders(doc: Document, data: Dict[str, str]) -> None:
-    """Replace ``{{KEY}}`` placeholders in all paragraphs and table cells."""
+def replace_placeholders(doc: Document, data: Dict[str, str]) -> Dict[str, int]:
+    """Replace ``{{KEY}}`` placeholders in all paragraphs and table cells.
 
-    def _replace_text(text: str, replacements: Iterable[tuple[str, str]]) -> str:
+    Returns a count of replacements performed per key for debug logging.
+    """
+
+    replacement_counts: Dict[str, int] = {key: 0 for key in data}
+
+    def _replace_text(text: str, replacements: Iterable[tuple[str, str]]) -> tuple[str, Dict[str, int]]:
+        local_counts: Dict[str, int] = {}
         for key, value in replacements:
             placeholder = f"{{{{{key}}}}}"
-            text = text.replace(placeholder, value)
-        return text
+            occurrences = text.count(placeholder)
+            if occurrences:
+                text = text.replace(placeholder, value)
+                replacement_counts[key] = replacement_counts.get(key, 0) + occurrences
+                local_counts[key] = local_counts.get(key, 0) + occurrences
+        return text, local_counts
 
     replacements = data.items()
 
     for paragraph in doc.paragraphs:
         original = paragraph.text
-        updated = _replace_text(original, replacements)
+        updated, local_counts = _replace_text(original, replacements)
         if updated != original:
+            logger.debug("Updated paragraph with placeholders", extra={"counts": local_counts})
             paragraph.text = updated
 
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
+    for table_index, table in enumerate(doc.tables):
+        for row_index, row in enumerate(table.rows):
+            for cell_index, cell in enumerate(row.cells):
                 original = cell.text
-                updated = _replace_text(original, replacements)
+                updated, local_counts = _replace_text(original, replacements)
                 if updated != original:
+                    logger.debug(
+                        "Updated table cell with placeholders",
+                        extra={
+                            "counts": local_counts,
+                            "table": table_index,
+                            "row": row_index,
+                            "cell": cell_index,
+                        },
+                    )
                     cell.text = updated
+
+    return replacement_counts
 
 
 def handler(payload: Dict) -> Dict:
@@ -95,6 +118,15 @@ def handler(payload: Dict) -> Dict:
 
         safe_template = _safe_filename(str(template_name), "template")
         safe_output = _safe_filename(str(output_name), "output_name") if output_name else None
+
+        logger.debug(
+            "Validated payload for docx-render",
+            extra={
+                "template": safe_template,
+                "output_name": safe_output,
+                "data_keys": sorted([str(key) for key in data.keys()]),
+            },
+        )
 
         template_path = os.path.join(TEMPLATES_DIR, safe_template)
         if not os.path.isfile(template_path):
@@ -120,7 +152,11 @@ def handler(payload: Dict) -> Dict:
         logger.info(f"Output path: {output_path}")
 
         document = Document(template_path)
-        replace_placeholders(document, {k: str(v) for k, v in data.items()})
+        replacement_counts = replace_placeholders(document, {k: str(v) for k, v in data.items()})
+        logger.debug(
+            "Placeholder replacement summary",
+            extra={"replacements": {k: v for k, v in replacement_counts.items() if v}},
+        )
         document.save(output_path)
 
         logger.info(f"Rendered DOCX written to {output_path}")
