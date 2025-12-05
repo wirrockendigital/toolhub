@@ -1,4 +1,4 @@
-name: Docker Release Build and Push
+name: Toolhub Docker Release Build and Push
 
 on:
   push:
@@ -13,9 +13,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -25,7 +22,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and Push Release Image
+      - name: Build and Push Toolhub Release Image (NAS only)
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -33,5 +30,5 @@ jobs:
           push: true
           platforms: linux/amd64
           tags: |
-            wirrockendigital/dein-image:latest
-            wirrockendigital/dein-image:${{ github.ref_name }}
+            wirrockendigital/toolhub:latest
+            wirrockendigital/toolhub:${{ github.ref_name }}
