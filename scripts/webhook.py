@@ -6,6 +6,7 @@ Exposes REST endpoints:
   GET  /             Service info & available routes
   GET/POST /test     Health check
   POST /audio-split  Split audio files from /shared/audio/in
+  POST /run          Dispatch registered Toolhub tools (e.g. docx-render)
 
 Logs all activity to /logs/webhook.log.
 """
@@ -13,6 +14,7 @@ from flask import Flask, request, jsonify
 import subprocess
 import logging
 import os
+import sys
 from werkzeug.utils import secure_filename
 import uuid
 from werkzeug.exceptions import HTTPException
@@ -38,6 +40,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 logger.debug(f"Environment variables: {dict(os.environ)}")
+
+TOOLS_ROOT = os.getenv("TOOLHUB_PYTHON_ROOT", "/workspace")
+if TOOLS_ROOT not in sys.path:
+    sys.path.append(TOOLS_ROOT)
+
+try:
+    from tools import TOOLS
+except Exception as exc:  # noqa: BLE001
+    TOOLS = {}
+    logger.exception("Failed to import tool registry", exc_info=exc)
 
 
 app = Flask(__name__)
@@ -80,7 +92,8 @@ def index():
         "endpoints": {
             "/":           "This help message",
             "/test":       "GET or POST health-check",
-            "/audio-split":"POST JSON {filename, mode, …} → split audio from /shared"
+            "/audio-split":"POST JSON {filename, mode, …} → split audio from /shared",
+            "/run":        "POST JSON {tool, payload} → run registered Toolhub tool"
         }
     }), 200
 
@@ -93,6 +106,48 @@ def test():
 
     data = request.get_json(force=True)
     return jsonify({"status": "ok", "message": "Toolhub webhook service is running", "received": data})
+
+
+# --- GENERIC TOOL DISPATCH ---
+@app.route("/run", methods=["POST"])
+def run_tool():
+    payload = request.get_json(force=True)
+
+    tool_name = payload.get("tool") if isinstance(payload, dict) else None
+    tool_payload = payload.get("payload") if isinstance(payload, dict) else None
+
+    if not tool_name:
+        return jsonify({"error": "tool is required"}), 400
+
+    if tool_name not in TOOLS:
+        logger.warning(f"Requested unknown tool: {tool_name}")
+        return jsonify({"error": f"Unknown tool '{tool_name}'"}), 404
+
+    handler = TOOLS[tool_name].get("handler")
+    if handler is None:
+        logger.error(f"Handler missing for tool: {tool_name}")
+        return jsonify({"error": f"Tool '{tool_name}' is not configured"}), 500
+
+    logger.info(
+        f"Dispatching tool '{tool_name}' with payload keys: {list(tool_payload.keys()) if isinstance(tool_payload, dict) else 'n/a'}"
+    )
+
+    try:
+        result = handler(tool_payload if isinstance(tool_payload, dict) else {})
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Tool execution failed", exc_info=exc)
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "error": {"type": exc.__class__.__name__, "message": str(exc)},
+                }
+            ),
+            500,
+        )
+
+    status_code = 200 if isinstance(result, dict) and result.get("status") == "ok" else 400
+    return jsonify(result), status_code
 
 
 # --- AUDIO SPLIT ENDPOINT ---
