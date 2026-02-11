@@ -1,0 +1,62 @@
+name: Toolhub CI
+
+on:
+  push:
+    branches:
+      - main
+      - "eric/**"
+  pull_request:
+
+jobs:
+  mcp-build:
+    name: MCP Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm install
+
+      - name: Build MCP server
+        run: npm run build
+
+      - name: Validate MCP tool discovery
+        run: |
+          npm run mcp:dev -- --list-tools > /tmp/mcp-tools.json
+          test -s /tmp/mcp-tools.json
+
+  python-tests:
+    name: Python Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Validate Python module syntax
+        run: |
+          python -m py_compile scripts/webhook.py
+          python -m py_compile mcp_tools/docx_template_fill/renderer.py
+          python -m py_compile mcp_tools/docx_template_fill/tool.py
+          python -m py_compile mcp_tools/docx_template_fill/validators.py
+
+      - name: Run docx template-fill tests
+        run: python -m unittest -q tests/docx_template_fill/test_tool.py

@@ -50,7 +50,7 @@ Toolhub can run in different modes depending on which services you enable.
 
 - **Base container** – Built from `Dockerfile`; entrypoint `start.sh` creates the `toolhubuser` user, prepares `/scripts`, `/shared`, `/logs`, starts SSH (`22`), cron, and Gunicorn for the webhook service (`5656`).
 - **Cron & scripts** – Host-mounted under `/volume1/docker/toolhub/scripts` and `/volume1/docker/toolhub/cron.d` (see `stack.yml`). Logs go to `/logs` (`audio-split.log`, `webhook.log`).
-- **Webhook mode** – `scripts/webhook.py` offers `/`, `/test`, and `/audio-split` endpoints to orchestrate automation from HTTP clients.
+- **Webhook mode** – `scripts/webhook.py` offers `/`, `/test`, `/audio-split`, and `/run` endpoints to orchestrate automation from HTTP clients.
 - **MCP mode (optional)** – Add the `docker-compose.mcp.yml` sidecar to run `src/mcp/server.ts`, discover shell/Python scripts, and expose them as MCP tools over stdio.
 - **Source layout highlights**:
   - `scripts/` – Shell & Python helpers (`audio-split.sh`, `webhook.py`).
@@ -157,17 +157,22 @@ version: "3.9"
 
 services:
   toolhub-mcp:
-    image: node:20-alpine
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    image: toolhub-mcp:local
     container_name: toolhub-mcp
     working_dir: /app
-    command: ["sh", "-c", "npm install --omit=dev && npm run build && npm run mcp:start"]
+    command: ["sh", "-c", "npm install && npm run build && npm run mcp:start"]
     restart: unless-stopped
     depends_on:
       - toolhub
     network_mode: "service:toolhub"
+    volumes_from:
+      - toolhub
     environment:
       SAFE_MODE: '${SAFE_MODE:-true}'
-      ALLOWLIST_PATHS: '${ALLOWLIST_PATHS:-/data,/tmp}'
+      ALLOWLIST_PATHS: '${ALLOWLIST_PATHS:-/data,/tmp,/shared,/logs,/app}'
       ALLOWLIST_HOSTS: '${ALLOWLIST_HOSTS:-localhost,127.0.0.1}'
       MCP_SCRIPTS_ROOT: '${MCP_SCRIPTS_ROOT:-/app/scripts}'
       MCP_COMMAND_TIMEOUT_MS: '${MCP_COMMAND_TIMEOUT_MS:-120000}'
@@ -175,6 +180,10 @@ services:
       MCP_RATE_LIMIT_COUNT: '${MCP_RATE_LIMIT_COUNT:-5}'
       MCP_RATE_LIMIT_WINDOW_MS: '${MCP_RATE_LIMIT_WINDOW_MS:-10000}'
       NUCLEI_TEMPLATES: '${NUCLEI_TEMPLATES:-/root/nuclei-templates}'
+      DOCX_TEMPLATE_ROOT: '${DOCX_TEMPLATE_ROOT:-/data/templates}'
+      DOCX_OUTPUT_ROOT: '${DOCX_OUTPUT_ROOT:-/data/output}'
+      DOCX_TEMPLATE_FILL_LOG_PATH: '${DOCX_TEMPLATE_FILL_LOG_PATH:-/logs/docx-template-fill.log}'
+      TOOLHUB_PYTHON_ROOT: '${TOOLHUB_PYTHON_ROOT:-/app}'
     volumes:
       - .:/app
       - ./scripts:/app/scripts:ro
@@ -192,7 +201,7 @@ services:
 | `TOOLHUB_UID` | `1061` | UID mapped to host user for proper volume permissions. |
 | `TOOLHUB_GID` | `100` | GID mapped to host group; must match host permissions. |
 | `SAFE_MODE` | `true` | Enables MCP guardrails (blocks destructive commands). |
-| `ALLOWLIST_PATHS` | `/data,/tmp` | Comma-separated allowed path prefixes for MCP tools (scripts under `/app/scripts` always allowed). |
+| `ALLOWLIST_PATHS` | `/data,/tmp,/shared,/logs,/app` | Comma-separated allowed path prefixes for MCP tools (scripts under `/app/scripts` always allowed). |
 | `ALLOWLIST_HOSTS` | `localhost,127.0.0.1` | Allowed hostnames for MCP networking tools. |
 | `MCP_COMMAND_TIMEOUT_MS` | `120000` | MCP command execution timeout in milliseconds. |
 | `MCP_MAX_OUTPUT` | `20000` | Max characters returned per MCP tool invocation. |
@@ -200,6 +209,11 @@ services:
 | `MCP_RATE_LIMIT_WINDOW_MS` | `10000` | Rate-limiting window for MCP tools (ms). |
 | `MCP_SCRIPTS_ROOT` | `/app/scripts` | Directory scanned for MCP-compatible scripts. |
 | `NUCLEI_TEMPLATES` | `/root/nuclei-templates` | Optional templates path for the `nuclei_safe` MCP tool. |
+| `DOCX_TEMPLATE_ROOT` | `/data/templates` | Template root used by the `docx-template-fill` MCP/Python tooling. |
+| `DOCX_OUTPUT_ROOT` | `/data/output` | Output root used by DOCX rendering tools. |
+| `DOCX_TEMPLATE_FILL_LOG_PATH` | `/logs/docx-template-fill.log` | Log file for the MCP `docx-template-fill` tool. |
+| `TOOLHUB_PYTHON_ROOT` | `/app` | Python import root used by webhook `/run` for local tool modules. |
+| `TOOLHUB_MANIFEST_TOOLS_DIR` | `/app/tools` | Directory that contains `tool.json` manifests for webhook `/run` CLI dispatch. |
 
 > **Tip:** When deploying via Portainer, upload `stack.env` first. The file includes `TOOLHUB_*` entries and can be edited directly in the Portainer UI.
 
@@ -281,14 +295,15 @@ Scripts can embed an MCP metadata block to override descriptions or JSON schemas
 - **Notes**: Requires `ffmpeg`, `ffprobe`, and `bc` (preinstalled). Enhancements enforce mono 16 kHz audio before splitting.
 
 ### `scripts/webhook.py`
-- **Purpose**: Flask service (served by Gunicorn) that orchestrates audio splitting over HTTP.
+- **Purpose**: Flask service (served by Gunicorn) that orchestrates audio splitting and tool dispatch over HTTP.
 - **Endpoints**:
   - `GET /` – Returns service metadata and available routes.
   - `GET /test` – Health probe returning `{"status": "ok"}`.
   - `POST /test` – Echoes JSON payloads for integration tests.
   - `POST /audio-split` – JSON body triggers `audio-split.sh` using files from `/shared/audio/in` and returns generated chunk metadata.
-- **Inputs**: JSON payload with `filename`, `mode`, `chunk_length`, and optional silence/enhancement parameters.
-- **Outputs**: JSON containing `job_id`, `output_dir`, and chunk filenames. Errors include log excerpts when available. Logs stored in `/logs/webhook.log`.
+  - `POST /run` – Dispatches Python tools (`tools/__init__.py`) and manifest CLI tools (`tools/*/tool.json`) using either `payload` (named args) or `args` (positional).
+- **Inputs**: JSON payload with `filename`, `mode`, `chunk_length`, and optional silence/enhancement parameters for `/audio-split`; JSON payload with `tool` plus `payload`/`args` for `/run`.
+- **Outputs**: JSON containing `job_id`, `output_dir`, and chunk filenames for `/audio-split`; JSON tool results for `/run`. Errors include log excerpts when available. Logs stored in `/logs/webhook.log`.
 
 ### `scripts/tests/mcp-smoke.sh`
 - **Purpose**: Validates MCP discovery locally.
@@ -299,7 +314,7 @@ Scripts can embed an MCP metadata block to override descriptions or JSON schemas
 - **Behavior**: Installs `node_modules` if missing, runs `npm run mcp:dev -- --list-tools`, and prints the first discovered tool (uses `jq` when present).
 
 ### Wake-on-LAN (`wol-cli`)
-- **Purpose**: Send Wake-on-LAN Magic Packets to physical devices from the MCP tool runner.
+- **Purpose**: Send Wake-on-LAN Magic Packets to physical devices via webhook `/run` or MCP tool execution.
 - **Setup**:
   1. Copy `config/wol-devices.sample.json` to `config/wol-devices.json` and edit the MAC addresses for your hosts.
   2. Optionally export `WOL_BROADCAST=192.168.123.255` (or another subnet broadcast) before starting the MCP server to override the default broadcast address.
@@ -382,6 +397,7 @@ npm run mcp:dev -- --list-tools | jq '.[0:5]'
 
 ## Versioning & Changelog
 - Current release: **0.1 (2025-07-11)** as documented in prior README.
+- Container releases are published to `ghcr.io/wirrockendigital/toolhub` via `.github/workflows/docker-release.yml` on `v*` tags.
 - TODO: Document formal changelog/versioning strategy (e.g., semantic releases or conventional commits).
 
 ## License
