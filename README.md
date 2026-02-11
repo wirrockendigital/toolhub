@@ -395,6 +395,13 @@ npm run mcp:dev -- --list-tools | jq '.[0:5]'
 
 ## Troubleshooting & FAQ
 - **Permission denied on mounted volumes** – Ensure `TOOLHUB_UID` and `TOOLHUB_GID` match the host user's UID/GID and that all `${TOOLHUB_BASEDIR}/toolhub/*` directories exist before deployment.
+- **Portainer shows only `unable to deploy stack` (no logs)** – First verify all bind-mount source directories exist on the host:
+  ```bash
+  mkdir -p /volume2/docker/toolhub/{conf,cron.d,logs,scripts,data} \
+           /volume2/docker/shared/audio/{in,out}
+  ```
+  Then redeploy the stack.
+- **Static IP deployment fails (`ipv4_address` set)** – If `TOOLHUB_IPV4_ADDRESS` is used, the external Docker network must have a user-defined subnet. Check `docker network inspect allmydocker-net` and confirm `IPAM.Config` contains a subnet (for example `192.168.123.0/24`).
 - **No audio chunks generated** – Check `/logs/audio-split.log`; the script aborts if the input file cannot be found or if `ffmpeg`/`ffprobe` are missing. The webhook also returns `log_tail` snippets when failures occur.
 - **MCP client cannot connect** – Verify the MCP sidecar is running, `SAFE_MODE` settings allow the requested paths/hosts, and the client connects over stdio (not HTTP).
 - **Cron job not firing** – Confirm cron files in `${TOOLHUB_BASEDIR}/toolhub/cron.d` end with a newline and use absolute paths or paths relative to `/shared`.
