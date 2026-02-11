@@ -2,17 +2,25 @@ version: "3.9"
 
 services:
   toolhub-mcp:
-    image: node:20-alpine
+    # Build from a Toolhub-based image so MCP can execute bundled CLIs and Python tools.
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    image: toolhub-mcp:local
     container_name: toolhub-mcp
     working_dir: /app
-    command: ["sh", "-c", "npm install --omit=dev && npm run build && npm run mcp:start"]
+    # Keep dev dependencies during install because tsc/tsx are required for build.
+    command: ["sh", "-c", "npm install && npm run build && npm run mcp:start"]
     restart: unless-stopped
     depends_on:
       - toolhub
     network_mode: "service:toolhub"
+    # Reuse base service volume mounts (/shared, /logs, etc.) for runtime parity.
+    volumes_from:
+      - toolhub
     environment:
       SAFE_MODE: '${SAFE_MODE:-true}'
-      ALLOWLIST_PATHS: '${ALLOWLIST_PATHS:-/data,/tmp}'
+      ALLOWLIST_PATHS: '${ALLOWLIST_PATHS:-/data,/tmp,/shared,/logs,/app}'
       ALLOWLIST_HOSTS: '${ALLOWLIST_HOSTS:-localhost,127.0.0.1}'
       MCP_SCRIPTS_ROOT: '${MCP_SCRIPTS_ROOT:-/app/scripts}'
       MCP_COMMAND_TIMEOUT_MS: '${MCP_COMMAND_TIMEOUT_MS:-120000}'
@@ -20,6 +28,10 @@ services:
       MCP_RATE_LIMIT_COUNT: '${MCP_RATE_LIMIT_COUNT:-5}'
       MCP_RATE_LIMIT_WINDOW_MS: '${MCP_RATE_LIMIT_WINDOW_MS:-10000}'
       NUCLEI_TEMPLATES: '${NUCLEI_TEMPLATES:-/root/nuclei-templates}'
+      DOCX_TEMPLATE_ROOT: '${DOCX_TEMPLATE_ROOT:-/data/templates}'
+      DOCX_OUTPUT_ROOT: '${DOCX_OUTPUT_ROOT:-/data/output}'
+      DOCX_TEMPLATE_FILL_LOG_PATH: '${DOCX_TEMPLATE_FILL_LOG_PATH:-/logs/docx-template-fill.log}'
+      TOOLHUB_PYTHON_ROOT: '${TOOLHUB_PYTHON_ROOT:-/app}'
     volumes:
       - .:/app
       - ./scripts:/app/scripts:ro
