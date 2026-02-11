@@ -18,22 +18,60 @@ This file documents the responsibilities and capabilities of automated agents or
   - `--silence-seek`, `--silence-duration`, `--silence-threshold`: Silence detection parameters.
   - `--padding`: Optional trim before split point.
   - `--enhance`, `--enhance-speech`: Optional filters for audio enhancement.
-- **Logging:** Logs all activity to `/logs/split-audio.log`.
+- **Logging:** Logs all activity to `/logs/audio-split.log`.
 
 ### 2. webhook.py
 - **Location:** `/scripts/webhook.py`
-- **Purpose:** Exposes HTTP endpoint `/audio-split` to trigger audio-split.sh via REST API.
-- **Method:** `POST`
-- **Input:** Multipart form-data with audio file and split parameters.
-- **Output:** Returns a downloadable `.zip` of the split audio files.
+- **Purpose:** Exposes orchestration endpoints (`/audio-split`, `/run`) for Toolhub scripts and tools.
+- **Methods:** `GET`, `POST`
+- **Input:** JSON payloads for `/audio-split` and `/run`.
+- **Output:** JSON responses with execution metadata, output paths, and error details.
 - **Logging:** All events and errors go to `/logs/webhook.log`.
 
+### 3. transcript.py
+- **Location:** `/scripts/transcript.py`
+- **Purpose:** Transcribes audio using Whisper CLI or OpenAI transcription API backend.
+- **Modes/Backends:** `auto`, `whisper-cli`, `openai`
+- **Parameters:**
+  - `--input`, `--output`, `--format`
+  - `--backend`, `--language`, `--model`, `--temperature`
+- **Logging:** Logs all activity to `/logs/transcript.log` (configurable).
+
+### 4. cleanup.py
+- **Location:** `/scripts/cleanup.py`
+- **Purpose:** Rotates large log files and removes stale temporary artifacts.
+- **Parameters:**
+  - `--logs-dir`, `--tmp-dir`
+  - `--max-log-size-mb`, `--max-log-backups`
+  - `--tmp-max-age-hours`, `--tmp-prefixes`, `--dry-run`
+- **Logging:** Logs all activity to `/logs/cleanup.log` (configurable).
+
+### 5. docx-render.py
+- **Location:** `/scripts/docx-render.py`
+- **Purpose:** CLI wrapper to expose `tools.docx_render.handler` for SSH/MCP/webhook script dispatch.
+- **Parameters:**
+  - `--payload` or `--payload-file`
+- **Logging:** Delegates rendering logs to `/logs/docx-render.log` via underlying tool.
+
+### 6. docx-template-fill.py
+- **Location:** `/scripts/docx-template-fill.py`
+- **Purpose:** CLI wrapper for `mcp_tools.docx_template_fill.fill_docx_template`.
+- **Parameters:**
+  - `--payload` or `--payload-file`
+- **Logging:** Uses `/logs/docx-template-fill.log` via underlying module settings.
+
+### 7. wol-cli.sh
+- **Location:** `/scripts/wol-cli.sh`
+- **Purpose:** Wrapper that delegates to `tools/wol-cli/wol-cli.sh` so WOL is reachable through `/scripts`.
+- **Parameters:**
+  - Positional target argument (MAC address or mapped device name)
+- **Logging:** Returns JSON to caller; errors are captured by caller logs (`webhook.log`/MCP output).
+
 ## Logging Policy
-All agents must log to the `/logs` directory. No logging to `stderr`, `stdout`, or home/user directories is allowed in production.
+All agents should log to the `/logs` directory. In integration workflows (webhook/MCP), compact JSON on stdout is allowed for machine-readable responses.
 
 ## Planned Agents
-- `transcript.py`: Future script to handle Whisper-based transcriptions.
-- `cleanup.py`: Automated log rotation and temporary file deletion.
+- None currently. Planned capabilities have been implemented as script tools.
 
 ---
 

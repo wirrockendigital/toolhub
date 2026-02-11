@@ -212,8 +212,12 @@ services:
 | `DOCX_TEMPLATE_ROOT` | `/data/templates` | Template root used by the `docx-template-fill` MCP/Python tooling. |
 | `DOCX_OUTPUT_ROOT` | `/data/output` | Output root used by DOCX rendering tools. |
 | `DOCX_TEMPLATE_FILL_LOG_PATH` | `/logs/docx-template-fill.log` | Log file for the MCP `docx-template-fill` tool. |
-| `TOOLHUB_PYTHON_ROOT` | `/app` | Python import root used by webhook `/run` for local tool modules. |
+| `TOOLHUB_PYTHON_ROOT` | `/opt/toolhub` | Python import root used by webhook `/run` and script wrappers for local tool modules (MCP sidecar overrides this to `/app`). |
 | `TOOLHUB_MANIFEST_TOOLS_DIR` | `/app/tools` | Directory that contains `tool.json` manifests for webhook `/run` CLI dispatch. |
+| `TOOLHUB_SCRIPT_TOOLS_DIR` | `/scripts` | Directory scanned by webhook `/run` for executable script tools. |
+| `TRANSCRIPT_INPUT_ROOT` | `/shared/audio/in` | Default input root for `scripts/transcript.py`. |
+| `TRANSCRIPT_OUTPUT_ROOT` | `/shared/audio/out/transcripts` | Default output root for `scripts/transcript.py`. |
+| `OPENAI_API_KEY` | *(unset)* | Optional API key for `scripts/transcript.py` OpenAI backend. |
 
 > **Tip:** When deploying via Portainer, upload `stack.env` first. The file includes `TOOLHUB_*` entries and can be edited directly in the Portainer UI.
 
@@ -221,7 +225,7 @@ services:
 TODO: Document bare-metal installation beyond Docker.
 
 ### Configuration notes
-- `start.sh` ensures `/scripts`, `/etc/cron.d`, `/logs`, and `/shared/audio/{in,out}` exist and are owned by `TOOLHUB_USER`.
+- `start.sh` ensures `/scripts`, `/etc/cron.d`, `/logs`, `/templates`, `/output`, `/data/{templates,output}`, and `/shared/audio/{in,out}` exist and are owned by `TOOLHUB_USER`.
 - Cron entries placed in `/etc/cron.d` run as `toolhubuser`; remember to add an empty newline at the end of each cron file.
 - All agent logs must live under `/logs` (see `AGENTS.md`).
 
@@ -301,9 +305,14 @@ Scripts can embed an MCP metadata block to override descriptions or JSON schemas
   - `GET /test` – Health probe returning `{"status": "ok"}`.
   - `POST /test` – Echoes JSON payloads for integration tests.
   - `POST /audio-split` – JSON body triggers `audio-split.sh` using files from `/shared/audio/in` and returns generated chunk metadata.
-  - `POST /run` – Dispatches Python tools (`tools/__init__.py`) and manifest CLI tools (`tools/*/tool.json`) using either `payload` (named args) or `args` (positional).
+  - `POST /run` – Dispatches Python tools (`tools/__init__.py`), manifest CLI tools (`tools/*/tool.json`), and executable `/scripts` tools using either `payload` (named args), `args` (positional), or direct top-level fields for script flags.
 - **Inputs**: JSON payload with `filename`, `mode`, `chunk_length`, and optional silence/enhancement parameters for `/audio-split`; JSON payload with `tool` plus `payload`/`args` for `/run`.
 - **Outputs**: JSON containing `job_id`, `output_dir`, and chunk filenames for `/audio-split`; JSON tool results for `/run`. Errors include log excerpts when available. Logs stored in `/logs/webhook.log`.
+- **`/run` Dispatch Order**:
+  1. Python tool registry (`tools/__init__.py`)
+  2. Manifest tools (`tools/*/tool.json`)
+  3. Executable scripts in `/scripts` (aliases like `py_transcript`, `sh_wol_cli`, `transcript`, `wol-cli.sh`)
+- **Python tools currently registered**: `docx-render`, `docx-template-fill`.
 
 ### `scripts/tests/mcp-smoke.sh`
 - **Purpose**: Validates MCP discovery locally.
@@ -338,6 +347,32 @@ Scripts can embed an MCP metadata block to override descriptions or JSON schemas
   ```
   Only enable host networking if you understand the security implications, as it exposes all container ports directly on the host.
 - **Platform reminder**: On macOS, ensure “Wake for network access” is enabled. Wake-on-LAN resumes devices from sleep/standby and does not power on machines that are fully shut down.
+
+### `scripts/transcript.py`
+- **Purpose**: Transcribe audio from `/shared/audio/in` and store outputs under `/shared/audio/out/transcripts`.
+- **Backends**:
+  - `whisper-cli` (local `whisper` binary if installed)
+  - `openai` (requires `OPENAI_API_KEY`)
+  - `auto` (prefers local Whisper, then OpenAI)
+- **Usage**:
+  ```bash
+  /scripts/transcript.py --input interview.m4a --format json --backend auto
+  ```
+
+### `scripts/cleanup.py`
+- **Purpose**: Rotate oversized logs and remove stale temp artifacts.
+- **Usage**:
+  ```bash
+  /scripts/cleanup.py --max-log-size-mb 50 --tmp-max-age-hours 24
+  ```
+
+### `scripts/docx-render.py` and `scripts/docx-template-fill.py`
+- **Purpose**: Script wrappers so DOCX rendering tools are reachable uniformly through SSH, MCP script discovery, and webhook `/run`.
+- **Usage**:
+  ```bash
+  /scripts/docx-render.py --payload-file /data/payload.json
+  /scripts/docx-template-fill.py --payload-file /data/payload.json
+  ```
 
 ## Examples
 
