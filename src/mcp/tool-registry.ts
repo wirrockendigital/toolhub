@@ -427,6 +427,7 @@ async function createDocxTemplateFillTool(config: McpConfig, limiter: RateLimite
 
   return [tool];
 }
+
 async function loadManifestTools(config: McpConfig, limiter: RateLimiter): Promise<RegisteredTool[]> {
   const results: RegisteredTool[] = [];
   const baseDir = path.resolve(process.cwd(), "tools");

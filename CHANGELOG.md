@@ -5,6 +5,7 @@
 
 ### Changed
 - MCP server version metadata bumped to 0.1.3.
+
 ## [0.1.2] – 2025-12-05
 ### Added
 - Debug-level logging for DOCX rendering to trace placeholder replacements across paragraphs and table cells.

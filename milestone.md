@@ -11,3 +11,4 @@
 7. Projektziel und Reifegradanalyse durchgeführt: n8n-sidecar Nutzen, verfügbare Tool-Klassen, sowie nicht-funktionale/inkonsistente Bereiche (MCP-Tooling, Cron-Job, Dockerfile-Buildrisiken) identifiziert.
 
 8. Merge-Konflikt in `src/mcp/tool-registry.ts` aufgelöst (vollständige Integration der `docx-template-fill`-Registry inkl. Manifest-Tool-Loader, fehlender Imports/Typen, Konfliktmarker entfernt, Datei wieder im normalen Modus gestaged).
+9. PR-Merge-Konflikte beim Aktualisieren von `eric/audit-project-and-create-plan` mit `origin/main` gelöst (`CHANGELOG.md`, `src/mcp/tool-registry.ts`), Konfliktmarker entfernt und Branch für Commit vorbereitet.
