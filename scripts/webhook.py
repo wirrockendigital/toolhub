@@ -15,6 +15,7 @@ import subprocess
 import logging
 import os
 import sys
+import json
 from werkzeug.utils import secure_filename
 import uuid
 from werkzeug.exceptions import HTTPException
@@ -41,7 +42,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logger.debug(f"Environment variables: {dict(os.environ)}")
 
+# Resolve Python tool root; fall back to current working directory for local runs.
 TOOLS_ROOT = os.getenv("TOOLHUB_PYTHON_ROOT", "/workspace")
+if not os.path.isdir(TOOLS_ROOT):
+    TOOLS_ROOT = os.getcwd()
 if TOOLS_ROOT not in sys.path:
     sys.path.append(TOOLS_ROOT)
 
@@ -50,6 +54,141 @@ try:
 except Exception as exc:  # noqa: BLE001
     TOOLS = {}
     logger.exception("Failed to import tool registry", exc_info=exc)
+
+MANIFEST_TOOLS_DIR = os.getenv("TOOLHUB_MANIFEST_TOOLS_DIR", os.path.join(TOOLS_ROOT, "tools"))
+
+
+def load_manifest_tools():
+    """Load manifest-defined CLI tools from TOOLHUB_MANIFEST_TOOLS_DIR."""
+    manifest_tools = {}
+    if not os.path.isdir(MANIFEST_TOOLS_DIR):
+        logger.info(f"Manifest tool directory not found: {MANIFEST_TOOLS_DIR}")
+        return manifest_tools
+
+    for entry in sorted(os.listdir(MANIFEST_TOOLS_DIR)):
+        tool_dir = os.path.join(MANIFEST_TOOLS_DIR, entry)
+        if not os.path.isdir(tool_dir):
+            continue
+
+        manifest_path = os.path.join(tool_dir, "tool.json")
+        if not os.path.isfile(manifest_path):
+            continue
+
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as fh:
+                manifest = json.load(fh)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Skipping invalid manifest '{manifest_path}': {exc}")
+            continue
+
+        tool_name = manifest.get("name")
+        command = manifest.get("command")
+        if not isinstance(tool_name, str) or not tool_name:
+            logger.warning(f"Skipping manifest without valid name: {manifest_path}")
+            continue
+        if not isinstance(command, str) or not command:
+            logger.warning(f"Skipping manifest without valid command: {manifest_path}")
+            continue
+
+        # Resolve command relative to its manifest directory when necessary.
+        command_path = command if os.path.isabs(command) else os.path.normpath(os.path.join(tool_dir, command))
+        if not os.path.isfile(command_path) or not os.access(command_path, os.X_OK):
+            logger.warning(f"Skipping tool '{tool_name}' because command is not executable: {command_path}")
+            continue
+
+        manifest_tools[tool_name] = {
+            "name": tool_name,
+            "description": manifest.get("description", ""),
+            "args": manifest.get("args", []),
+            "command_path": command_path,
+        }
+
+    logger.info(f"Loaded {len(manifest_tools)} manifest tool(s) from {MANIFEST_TOOLS_DIR}")
+    return manifest_tools
+
+
+# Load manifests once at startup; runtime requests only execute already discovered tools.
+MANIFEST_TOOLS = load_manifest_tools()
+
+
+def build_manifest_args(request_data, manifest):
+    """Build positional args for a manifest tool from args[] or payload fields."""
+    # Accept legacy 'args' for direct positional forwarding.
+    raw_args = request_data.get("args")
+    if raw_args is not None:
+        if not isinstance(raw_args, list):
+            raise ValueError("'args' must be an array when provided.")
+        return [str(item) for item in raw_args]
+
+    # Accept structured payload object and map values by manifest arg order.
+    payload = request_data.get("payload")
+    if payload is not None and not isinstance(payload, dict):
+        raise ValueError("'payload' must be an object when provided.")
+
+    # Also allow top-level arg keys as convenience for simple webhook clients.
+    payload_map = payload if isinstance(payload, dict) else request_data
+    arg_defs = manifest.get("args", []) if isinstance(manifest.get("args"), list) else []
+    if not arg_defs:
+        return []
+
+    resolved_args = []
+    for arg_def in arg_defs:
+        arg_name = arg_def.get("name") if isinstance(arg_def, dict) else None
+        required = arg_def.get("required", True) if isinstance(arg_def, dict) else True
+        if not arg_name:
+            continue
+        value = payload_map.get(arg_name)
+        if value is None:
+            if required:
+                raise ValueError(f"Missing required argument '{arg_name}'.")
+            continue
+        resolved_args.append(str(value))
+
+    return resolved_args
+
+
+def execute_manifest_tool(tool_name, manifest, request_data):
+    """Execute a manifest CLI tool and normalize stdout into JSON when possible."""
+    command_path = manifest["command_path"]
+    args = build_manifest_args(request_data, manifest)
+    cmd = [command_path, *args]
+    logger.info(f"Executing manifest tool '{tool_name}': {' '.join(cmd)}")
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=120)
+    except subprocess.TimeoutExpired as exc:
+        logger.exception(f"Manifest tool timeout: {tool_name}")
+        return jsonify({"status": "error", "tool": tool_name, "error": {"type": "TimeoutExpired", "message": str(exc)}}), 504
+
+    stdout_text = (result.stdout or "").strip()
+    stderr_text = (result.stderr or "").strip()
+
+    # Parse JSON output when tool scripts return structured payloads.
+    parsed_stdout = None
+    if stdout_text:
+        try:
+            parsed_stdout = json.loads(stdout_text)
+        except Exception:  # noqa: BLE001
+            parsed_stdout = None
+
+    if result.returncode != 0:
+        error_payload = {
+            "status": "error",
+            "tool": tool_name,
+            "exit_code": result.returncode,
+            "stdout": stdout_text,
+            "stderr": stderr_text,
+        }
+        # Preserve structured script errors when available.
+        if isinstance(parsed_stdout, dict):
+            error_payload["result"] = parsed_stdout
+        return jsonify(error_payload), 400
+
+    # Return structured script result directly when possible.
+    if isinstance(parsed_stdout, dict):
+        return jsonify(parsed_stdout), 200
+
+    return jsonify({"status": "ok", "tool": tool_name, "stdout": stdout_text, "stderr": stderr_text}), 200
 
 
 app = Flask(__name__)
@@ -93,7 +232,7 @@ def index():
             "/":           "This help message",
             "/test":       "GET or POST health-check",
             "/audio-split":"POST JSON {filename, mode, …} → split audio from /shared",
-            "/run":        "POST JSON {tool, payload} → run registered Toolhub tool"
+            "/run":        "POST JSON {tool, payload|args} → run Python or manifest Toolhub tool"
         }
     }), 200
 
@@ -114,40 +253,51 @@ def run_tool():
     payload = request.get_json(force=True)
 
     tool_name = payload.get("tool") if isinstance(payload, dict) else None
-    tool_payload = payload.get("payload") if isinstance(payload, dict) else None
+    tool_payload = payload.get("payload") if isinstance(payload, dict) else {}
 
     if not tool_name:
         return jsonify({"error": "tool is required"}), 400
 
-    if tool_name not in TOOLS:
-        logger.warning(f"Requested unknown tool: {tool_name}")
-        return jsonify({"error": f"Unknown tool '{tool_name}'"}), 404
+    # Dispatch Python in-process handlers first.
+    if tool_name in TOOLS:
+        handler = TOOLS[tool_name].get("handler")
+        if handler is None:
+            logger.error(f"Handler missing for tool: {tool_name}")
+            return jsonify({"error": f"Tool '{tool_name}' is not configured"}), 500
 
-    handler = TOOLS[tool_name].get("handler")
-    if handler is None:
-        logger.error(f"Handler missing for tool: {tool_name}")
-        return jsonify({"error": f"Tool '{tool_name}' is not configured"}), 500
-
-    logger.info(
-        f"Dispatching tool '{tool_name}' with payload keys: {list(tool_payload.keys()) if isinstance(tool_payload, dict) else 'n/a'}"
-    )
-
-    try:
-        result = handler(tool_payload if isinstance(tool_payload, dict) else {})
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("Tool execution failed", exc_info=exc)
-        return (
-            jsonify(
-                {
-                    "status": "error",
-                    "error": {"type": exc.__class__.__name__, "message": str(exc)},
-                }
-            ),
-            500,
+        logger.info(
+            f"Dispatching Python tool '{tool_name}' with payload keys: {list(tool_payload.keys()) if isinstance(tool_payload, dict) else 'n/a'}"
         )
+        try:
+            result = handler(tool_payload if isinstance(tool_payload, dict) else {})
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Python tool execution failed", exc_info=exc)
+            return (
+                jsonify(
+                    {
+                        "status": "error",
+                        "error": {"type": exc.__class__.__name__, "message": str(exc)},
+                    }
+                ),
+                500,
+            )
 
-    status_code = 200 if isinstance(result, dict) and result.get("status") == "ok" else 400
-    return jsonify(result), status_code
+        status_code = 200 if isinstance(result, dict) and result.get("status") == "ok" else 400
+        return jsonify(result), status_code
+
+    # Fallback to manifest-based external CLI tools.
+    if tool_name in MANIFEST_TOOLS:
+        try:
+            return execute_manifest_tool(tool_name, MANIFEST_TOOLS[tool_name], payload)
+        except ValueError as exc:
+            logger.warning(f"Invalid manifest tool request for '{tool_name}': {exc}")
+            return jsonify({"status": "error", "tool": tool_name, "error": {"type": "ValidationError", "message": str(exc)}}), 400
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Manifest tool execution failed", exc_info=exc)
+            return jsonify({"status": "error", "tool": tool_name, "error": {"type": exc.__class__.__name__, "message": str(exc)}}), 500
+
+    logger.warning(f"Requested unknown tool: {tool_name}")
+    return jsonify({"error": f"Unknown tool '{tool_name}'"}), 404
 
 
 # --- AUDIO SPLIT ENDPOINT ---
