@@ -4,6 +4,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Base system & essentials
 RUN apt-get update && apt-get install -y --no-install-recommends curl       # Command-line tool for HTTP requests
+RUN apt-get install -y --no-install-recommends netbase                      # Provide /etc/protocols and /etc/services for networking CLIs
 RUN apt-get install -y --no-install-recommends wget                         # Download files from the internet
 RUN apt-get install -y --no-install-recommends git                          # Git version control
 RUN apt-get install -y --no-install-recommends nano                         # Terminal text editor
@@ -62,6 +63,12 @@ RUN if command -v fdfind >/dev/null 2>&1; then ln -sf "$(command -v fdfind)" /us
 COPY requirements.txt /tmp/requirements.txt
 RUN pip3 install --no-cache-dir --break-system-packages -r /tmp/requirements.txt && rm /tmp/requirements.txt
 
+# Ship Python tool modules inside the image so webhook/script wrappers work without a repo bind mount.
+COPY tools/ /opt/toolhub/tools/
+COPY mcp_tools/ /opt/toolhub/mcp_tools/
+# Ensure copied sources are readable/executable for the non-root runtime user.
+RUN chmod -R a+rX /opt/toolhub
+
 # Gunicorn (for Flask web API)
 RUN apt-get update && apt-get install -y --no-install-recommends python3-gunicorn && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -80,6 +87,7 @@ RUN sed -i 's/\r$//' /start.sh && \
 RUN chmod -R 755 /bootstrap
 
 ENV PATH="/scripts:$PATH"
+ENV TOOLHUB_PYTHON_ROOT="/opt/toolhub"
 
 # SSH configuration
 RUN mkdir /var/run/sshd && \

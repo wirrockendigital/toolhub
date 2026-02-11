@@ -40,7 +40,7 @@ fi
 
 
 # Ensure necessary directories exist with correct ownership
-for dir in /scripts /etc/cron.d /logs /var/run/cron; do
+for dir in /scripts /etc/cron.d /logs /var/run/cron /templates /output /data /data/templates /data/output; do
   echo "[INIT] Creating or fixing directory: $dir"
   mkdir -p "$dir"
   chown "$TOOLHUB_USER:$GROUP_NAME" "$dir"
