@@ -18,7 +18,7 @@ This document lists the currently available Toolhub features, where they can be 
 | DOCX template fill | `scripts/docx-template-fill.py` | `/run` tool: `docx-template-fill` or `docx_template_fill` | `docx-template-fill.fill_docx_template`, `py_docx_template_fill` | Reads templates from `/templates`, writes to `/output`. |
 | Wake-on-LAN | `scripts/wol-cli.sh` | `/run` tool: `wol-cli`, `wol_cli` | `sh_wol_cli`, `wol-cli` | Sends magic packet by MAC or configured device alias. |
 | Cleanup | `scripts/cleanup.py` | `/run` tool: `cleanup` | `py_cleanup` | Supports safe preview with `--dry-run`. |
-| Transcript | `scripts/transcript.py` | `/run` tool: `transcript` | `py_transcript` | Needs backend (`whisper` CLI or `OPENAI_API_KEY`). |
+| Transcript | `scripts/transcript.py` | `/run` tool: `transcript` | `py_transcript` | Needs local `whisper` CLI backend. |
 
 ## Webhook Contracts
 
@@ -191,4 +191,3 @@ Additionally available when binaries are present:
 - `pdftotext_extract`
 - `pdfinfo_read`
 - `nuclei_safe` (guardrailed nuclei execution)
-

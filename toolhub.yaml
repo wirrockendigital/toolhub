@@ -1,0 +1,81 @@
+services:
+  # Base Toolhub service with webhook, SSH, cron, and bundled scripts.
+  toolhub:
+    # Use the published image so Portainer can deploy without local builds.
+    image: ghcr.io/wirrockendigital/toolhub:latest
+    # Keep the container name stable for easier operations and logs.
+    container_name: toolhub
+    # Set a predictable hostname for inter-container references.
+    hostname: toolhub
+    # Restart automatically after host reboot or runtime failures.
+    restart: unless-stopped
+    # Keep interactive shell behavior available for SSH/debug sessions.
+    stdin_open: true
+    tty: true
+
+    # Map container ports to host ports (customize in Portainer env vars if needed).
+    ports:
+      - "${TOOLHUB_SSH_PORT}:22"
+      - "${TOOLHUB_WEBHOOK_PORT}:5656"
+
+    environment:
+      # Configure the runtime user that start.sh creates/adjusts inside the container.
+      TOOLHUB_USER: "${TOOLHUB_USER}"
+      TOOLHUB_PASSWORD: "${TOOLHUB_PASSWORD}"
+      TOOLHUB_UID: "${TOOLHUB_UID}"
+      TOOLHUB_GID: "${TOOLHUB_GID}"
+      # Keep Python module discovery aligned with the image runtime layout.
+      TOOLHUB_PYTHON_ROOT: "${TOOLHUB_PYTHON_ROOT}"
+      # Keep /run script and manifest discovery explicit and overridable.
+      TOOLHUB_MANIFEST_TOOLS_DIR: "${TOOLHUB_MANIFEST_TOOLS_DIR}"
+      TOOLHUB_SCRIPT_TOOLS_DIR: "${TOOLHUB_SCRIPT_TOOLS_DIR}"
+      # Keep DOCX tool roots/logging configurable from the stack environment.
+      DOCX_TEMPLATE_ROOT: "${DOCX_TEMPLATE_ROOT}"
+      DOCX_OUTPUT_ROOT: "${DOCX_OUTPUT_ROOT}"
+      DOCX_TEMPLATE_FILL_LOG_PATH: "${DOCX_TEMPLATE_FILL_LOG_PATH}"
+      DOCX_TEMPLATE_FILL_LOG_LEVEL: "${DOCX_TEMPLATE_FILL_LOG_LEVEL}"
+      DOCX_TEMPLATES_DIR: "${DOCX_TEMPLATES_DIR}"
+      DOCX_OUTPUT_DIR: "${DOCX_OUTPUT_DIR}"
+      DOCX_RENDER_LOG: "${DOCX_RENDER_LOG}"
+      DOCX_RENDER_LOG_LEVEL: "${DOCX_RENDER_LOG_LEVEL}"
+      # Keep cleanup/transcript logging configurable from the stack environment.
+      CLEANUP_LOG_PATH: "${CLEANUP_LOG_PATH}"
+      CLEANUP_LOG_LEVEL: "${CLEANUP_LOG_LEVEL}"
+      # Configure transcript defaults for local/file-based processing in Toolhub.
+      TRANSCRIPT_INPUT_ROOT: "${TRANSCRIPT_INPUT_ROOT}"
+      TRANSCRIPT_OUTPUT_ROOT: "${TRANSCRIPT_OUTPUT_ROOT}"
+      TRANSCRIPT_LOG_PATH: "${TRANSCRIPT_LOG_PATH}"
+      TRANSCRIPT_LOG_LEVEL: "${TRANSCRIPT_LOG_LEVEL}"
+
+    volumes:
+      # Build all host paths from TOOLHUB_BASEDIR.
+      - "${TOOLHUB_BASEDIR}/toolhub:/workspace"
+      # Persist script overrides and custom script tooling.
+      - "${TOOLHUB_BASEDIR}/toolhub/scripts:/scripts"
+      # Persist cron definitions managed outside the container image.
+      - "${TOOLHUB_BASEDIR}/toolhub/cron.d:/etc/cron.d"
+      # Persist all service and tool logs.
+      - "${TOOLHUB_BASEDIR}/toolhub/logs:/logs"
+      # Share data with n8n or other services (audio input/output, files, payloads).
+      - "${TOOLHUB_BASEDIR}/shared:/shared"
+      # Persist DOCX template/output directories used by render/fill tooling.
+      - "${TOOLHUB_BASEDIR}/toolhub/data:/data"
+
+    # Provide a simple health probe so Portainer can surface service state.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5656/test"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+    # Attach the service to the existing shared Docker network with a fixed IP.
+    networks:
+      allmydocker-net:
+        ipv4_address: "${TOOLHUB_IPV4_ADDRESS}"
+
+networks:
+  # Reuse the existing external network managed outside this stack.
+  allmydocker-net:
+    name: "${TOOLHUB_DOCKER_NETWORK}"
+    external: true

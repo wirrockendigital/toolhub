@@ -30,11 +30,11 @@ This file documents the responsibilities and capabilities of automated agents or
 
 ### 3. transcript.py
 - **Location:** `/scripts/transcript.py`
-- **Purpose:** Transcribes audio using Whisper CLI or OpenAI transcription API backend.
-- **Modes/Backends:** `auto`, `whisper-cli`, `openai`
+- **Purpose:** Transcribes audio using local Whisper CLI backend.
+- **Modes/Backends:** `auto`, `whisper-cli`
 - **Parameters:**
   - `--input`, `--output`, `--format`
-  - `--backend`, `--language`, `--model`, `--temperature`
+  - `--backend`, `--language`, `--model`
 - **Logging:** Logs all activity to `/logs/transcript.log` (configurable).
 
 ### 4. cleanup.py

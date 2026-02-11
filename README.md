@@ -7,6 +7,7 @@ Universal sidecar container for automation platforms, MCP clients, and self-host
 - [Architecture & Modes](#architecture--modes)
 - [Quickstart](#quickstart)
 - [Installation & Setup](#installation--setup)
+- [Feature Contract](#feature-contract)
 - [Using Toolhub as an MCP Server](#using-toolhub-as-an-mcp-server)
 - [CLI & Tools](#cli--tools)
 - [Examples](#examples)
@@ -49,32 +50,32 @@ Toolhub can run in different modes depending on which services you enable.
 ```
 
 - **Base container** – Built from `Dockerfile`; entrypoint `start.sh` creates the `toolhubuser` user, prepares `/scripts`, `/shared`, `/logs`, starts SSH (`22`), cron, and Gunicorn for the webhook service (`5656`).
-- **Cron & scripts** – Host-mounted under `/volume1/docker/toolhub/scripts` and `/volume1/docker/toolhub/cron.d` (see `stack.yml`). Logs go to `/logs` (`audio-split.log`, `webhook.log`).
+- **Cron & scripts** – Host-mounted under `${TOOLHUB_BASEDIR}/toolhub/scripts` and `${TOOLHUB_BASEDIR}/toolhub/cron.d` (see `toolhub.yaml`). Logs go to `/logs` (`audio-split.log`, `webhook.log`).
 - **Webhook mode** – `scripts/webhook.py` offers `/`, `/test`, `/audio-split`, and `/run` endpoints to orchestrate automation from HTTP clients.
 - **MCP mode (optional)** – Add the `docker-compose.mcp.yml` sidecar to run `src/mcp/server.ts`, discover shell/Python scripts, and expose them as MCP tools over stdio.
 - **Source layout highlights**:
   - `scripts/` – Shell & Python helpers (`audio-split.sh`, `webhook.py`).
   - `scripts/tests/` – Automated smoke tests (`mcp-smoke.sh`).
   - `src/mcp/` – TypeScript MCP implementation (`server.ts`, `config.ts`, `tool-registry.ts`, ...).
-  - `stack.yml`, `docker-compose.mcp.yml` – Deployment descriptors.
-  - `stack.env` – Example environment variable definitions for Portainer stacks.
+  - `toolhub.yaml`, `docker-compose.mcp.yml` – Deployment descriptors.
+  - `toolhub.env` – Example environment variable definitions for Portainer stacks.
 
 ## Quickstart
 The fastest way to launch Toolhub (webhook + optional MCP) is via Docker Compose on a Docker-capable host (e.g. Synology NAS).
 
 ```bash
 # 1. Prepare host directories with matching permissions
-mkdir -p /volume1/docker/toolhub/{conf,cron.d,logs,scripts} \
-         /volume1/docker/shared/audio/{in,out}
+mkdir -p /volume2/docker/toolhub/{conf,cron.d,logs,scripts,data} \
+         /volume2/docker/shared/audio/{in,out}
 
 # 2. Copy stack files from this repository
-cp stack.yml stack.env /volume1/docker/toolhub/
+cp toolhub.yaml toolhub.env /volume2/docker/toolhub/
 
 # 3. Deploy Toolhub (base container only)
-docker compose -f stack.yml up -d
+docker compose --env-file toolhub.env -f toolhub.yaml up -d
 
 # 4. (Optional) Bring up the MCP sidecar alongside the base container
-docker compose -f stack.yml -f docker-compose.mcp.yml up -d
+docker compose --env-file toolhub.env -f toolhub.yaml -f docker-compose.mcp.yml up -d
 
 # 5. Smoke-test the webhook API
 curl http://localhost:5656/test
@@ -85,67 +86,34 @@ The `/test` endpoint replies with `{ "status": "ok" }`, confirming that SSH, cro
 ## Installation & Setup
 
 ### Docker / Docker Compose
-Toolhub is optimized for Synology NAS deployments but runs on any Docker host. The recommended Portainer-compatible `stack.yml`:
+Toolhub is optimized for Synology NAS deployments but runs on any Docker host.
+The repository ships the canonical Portainer stack files:
 
-```yaml
-version: "3.9"
-
-services:
-  toolhub:
-    image: ghcr.io/wirrockendigital/toolhub:latest
-    container_name: toolhub
-    hostname: toolhub
-    restart: always
-    stdin_open: true
-    tty: true
-    expose:
-      - "22"
-      - "5656"
-    ports:
-      - "2222:22"
-      - "5656:5656"
-    volumes:
-      - /volume1/docker/toolhub:/workspace
-      - /volume1/docker/toolhub/scripts:/scripts
-      - /volume1/docker/toolhub/cron.d:/etc/cron.d
-      - /volume1/docker/toolhub/logs:/logs
-      - /volume1/docker/shared:/shared
-    deploy:
-      resources:
-        reservations:
-          memory: 256M
-        limits:
-          memory: 2G
-    networks:
-      allmydocker-net:
-        ipv4_address: 192.168.123.100
-
-networks:
-  allmydocker-net:
-    external: true
-```
+- `toolhub.yaml` (base service, webhook/SSH/cron, strict env interpolation)
+- `toolhub.env` (required variables for `toolhub.yaml`)
 
 1. Create the `allmydocker-net` Docker network (e.g., `docker network create --subnet 192.168.123.0/24 allmydocker-net`).
 2. Ensure the host directories listed under `volumes` exist and have writable permissions for the `TOOLHUB_UID` and `TOOLHUB_GID` values.
-3. Upload `stack.yml` and `stack.env` in Portainer (or run `docker compose -f stack.yml up -d` on the CLI).
-4. Adjust `stack.env` values as needed, then deploy.
+3. Upload `toolhub.yaml` and `toolhub.env` in Portainer (or run `docker compose --env-file toolhub.env -f toolhub.yaml up -d` on the CLI).
+4. Adjust `toolhub.env` values as needed, then deploy (all variables in `toolhub.yaml` are strict `${VAR}` references without fallbacks).
 
 **Standalone Docker CLI**
 
 ```bash
-cd /volume1/docker/toolhub
+cd /volume2/docker/toolhub
 
 docker build -t toolhub:latest .
 
 docker run -d \
   --name toolhub \
   --network allmydocker-net \
-  --ip 192.168.123.100 \
-  -v /volume1/docker/toolhub:/workspace \
-  -v /volume1/docker/shared:/shared \
-  -v /volume1/docker/toolhub/scripts:/scripts \
-  -v /volume1/docker/toolhub/cron.d:/etc/cron.d \
-  -v /volume1/docker/toolhub/logs:/logs \
+  --ip 192.168.123.5 \
+  -v /volume2/docker/toolhub:/workspace \
+  -v /volume2/docker/shared:/shared \
+  -v /volume2/docker/toolhub/scripts:/scripts \
+  -v /volume2/docker/toolhub/cron.d:/etc/cron.d \
+  -v /volume2/docker/toolhub/logs:/logs \
+  -v /volume2/docker/toolhub/data:/data \
   toolhub:latest
 ```
 
@@ -196,10 +164,25 @@ services:
 
 | Variable | Default / Example | Description |
 | --- | --- | --- |
+| `TOOLHUB_BASEDIR` | `/volume2/docker` | Base host path used to build all bind mounts in `toolhub.yaml`. |
+| `TOOLHUB_DOCKER_NETWORK` | `allmydocker-net` | External Docker network name used by Toolhub. |
+| `TOOLHUB_IPV4_ADDRESS` | `192.168.123.5` | Fixed container IP on `TOOLHUB_DOCKER_NETWORK`. |
+| `TOOLHUB_SSH_PORT` | `2222` | Published SSH port for Toolhub. |
+| `TOOLHUB_WEBHOOK_PORT` | `5656` | Published webhook port for Toolhub. |
 | `TOOLHUB_USER` | `toolhubuser` | User created inside the container for SSH and cron execution (`start.sh`). |
 | `TOOLHUB_PASSWORD` | `toolhub123` | Password for `TOOLHUB_USER`; change after deployment. |
 | `TOOLHUB_UID` | `1061` | UID mapped to host user for proper volume permissions. |
 | `TOOLHUB_GID` | `100` | GID mapped to host group; must match host permissions. |
+| `TOOLHUB_MANIFEST_TOOLS_DIR` | `/opt/toolhub/tools` | Directory that contains `tool.json` manifests for webhook `/run` CLI dispatch. |
+| `TOOLHUB_SCRIPT_TOOLS_DIR` | `/scripts` | Directory scanned by webhook `/run` for executable script tools. |
+| `TOOLHUB_PYTHON_ROOT` | `/opt/toolhub` | Python import root used by webhook `/run` and script wrappers for local tool modules. |
+| `DOCX_TEMPLATE_ROOT` | `/templates` | Template root used by `docx-template-fill`. |
+| `DOCX_OUTPUT_ROOT` | `/output` | Output root used by `docx-template-fill`. |
+| `DOCX_TEMPLATE_FILL_LOG_PATH` | `/logs/docx-template-fill.log` | Log file for `docx-template-fill`. |
+| `DOCX_TEMPLATES_DIR` | `/data/templates` | Template root used by `docx-render`. |
+| `DOCX_OUTPUT_DIR` | `/data/output` | Output root used by `docx-render`. |
+| `DOCX_RENDER_LOG` | `/logs/docx-render.log` | Log file for `docx-render`. |
+| `CLEANUP_LOG_PATH` | `/logs/cleanup.log` | Log file for cleanup runs. |
 | `SAFE_MODE` | `true` | Enables MCP guardrails (blocks destructive commands). |
 | `ALLOWLIST_PATHS` | `/data,/tmp,/shared,/logs,/app` | Comma-separated allowed path prefixes for MCP tools (scripts under `/app/scripts` always allowed). |
 | `ALLOWLIST_HOSTS` | `localhost,127.0.0.1` | Allowed hostnames for MCP networking tools. |
@@ -209,17 +192,15 @@ services:
 | `MCP_RATE_LIMIT_WINDOW_MS` | `10000` | Rate-limiting window for MCP tools (ms). |
 | `MCP_SCRIPTS_ROOT` | `/app/scripts` | Directory scanned for MCP-compatible scripts. |
 | `NUCLEI_TEMPLATES` | `/root/nuclei-templates` | Optional templates path for the `nuclei_safe` MCP tool. |
-| `DOCX_TEMPLATE_ROOT` | `/data/templates` | Template root used by the `docx-template-fill` MCP/Python tooling. |
-| `DOCX_OUTPUT_ROOT` | `/data/output` | Output root used by DOCX rendering tools. |
-| `DOCX_TEMPLATE_FILL_LOG_PATH` | `/logs/docx-template-fill.log` | Log file for the MCP `docx-template-fill` tool. |
-| `TOOLHUB_PYTHON_ROOT` | `/opt/toolhub` | Python import root used by webhook `/run` and script wrappers for local tool modules (MCP sidecar overrides this to `/app`). |
-| `TOOLHUB_MANIFEST_TOOLS_DIR` | `/app/tools` | Directory that contains `tool.json` manifests for webhook `/run` CLI dispatch. |
-| `TOOLHUB_SCRIPT_TOOLS_DIR` | `/scripts` | Directory scanned by webhook `/run` for executable script tools. |
 | `TRANSCRIPT_INPUT_ROOT` | `/shared/audio/in` | Default input root for `scripts/transcript.py`. |
 | `TRANSCRIPT_OUTPUT_ROOT` | `/shared/audio/out/transcripts` | Default output root for `scripts/transcript.py`. |
-| `OPENAI_API_KEY` | *(unset)* | Optional API key for `scripts/transcript.py` OpenAI backend. |
+| `TRANSCRIPT_LOG_PATH` | `/logs/transcript.log` | Log file for transcript runs. |
+| `TRANSCRIPT_LOG_LEVEL` | `INFO` | Log level for transcript runs. |
 
-> **Tip:** When deploying via Portainer, upload `stack.env` first. The file includes `TOOLHUB_*` entries and can be edited directly in the Portainer UI.
+> **Tip:** When deploying via Portainer, upload `toolhub.env` first. The file includes `TOOLHUB_*` entries and can be edited directly in the Portainer UI.
+
+## Feature Contract
+For the current, validated feature matrix and interface-specific invocation examples, see `docs/features.md`.
 
 ### Bare-metal / local installs
 TODO: Document bare-metal installation beyond Docker.
@@ -232,7 +213,7 @@ TODO: Document bare-metal installation beyond Docker.
 ## Using Toolhub as an MCP Server
 The TypeScript MCP server turns every Toolhub script or curated CLI wrapper into an MCP tool.
 
-1. Launch the MCP sidecar (`docker compose -f stack.yml -f docker-compose.mcp.yml up -d`).
+1. Launch the MCP sidecar (`docker compose --env-file toolhub.env -f toolhub.yaml -f docker-compose.mcp.yml up -d`).
 2. The sidecar installs dependencies, builds TypeScript sources, and runs `npm run mcp:start`, which boots `src/mcp/server.ts`.
 3. Tools are exposed over stdio for MCP clients (Claude Desktop custom servers, Codex IDE integrations, etc.).
 
@@ -352,8 +333,7 @@ Scripts can embed an MCP metadata block to override descriptions or JSON schemas
 - **Purpose**: Transcribe audio from `/shared/audio/in` and store outputs under `/shared/audio/out/transcripts`.
 - **Backends**:
   - `whisper-cli` (local `whisper` binary if installed)
-  - `openai` (requires `OPENAI_API_KEY`)
-  - `auto` (prefers local Whisper, then OpenAI)
+  - `auto` (tries local Whisper CLI)
 - **Usage**:
   ```bash
   /scripts/transcript.py --input interview.m4a --format json --backend auto
@@ -379,7 +359,7 @@ Scripts can embed an MCP metadata block to override descriptions or JSON schemas
 ### Split audio locally via CLI
 ```bash
 # Place input file under /shared/audio/in on the host volume
-cp ~/Downloads/interview.m4a /volume1/docker/shared/audio/in/
+cp ~/Downloads/interview.m4a /volume2/docker/shared/audio/in/
 
 # Run fixed-length splitting (30-second chunks)
 docker exec -it toolhub \
@@ -414,10 +394,10 @@ npm run mcp:dev -- --list-tools | jq '.[0:5]'
 ```
 
 ## Troubleshooting & FAQ
-- **Permission denied on mounted volumes** – Ensure `TOOLHUB_UID` and `TOOLHUB_GID` match the host user's UID/GID and that all `/volume1/docker/toolhub/*` directories exist before deployment.
+- **Permission denied on mounted volumes** – Ensure `TOOLHUB_UID` and `TOOLHUB_GID` match the host user's UID/GID and that all `${TOOLHUB_BASEDIR}/toolhub/*` directories exist before deployment.
 - **No audio chunks generated** – Check `/logs/audio-split.log`; the script aborts if the input file cannot be found or if `ffmpeg`/`ffprobe` are missing. The webhook also returns `log_tail` snippets when failures occur.
 - **MCP client cannot connect** – Verify the MCP sidecar is running, `SAFE_MODE` settings allow the requested paths/hosts, and the client connects over stdio (not HTTP).
-- **Cron job not firing** – Confirm cron files in `/volume1/docker/toolhub/cron.d` end with a newline and use absolute paths or paths relative to `/shared`.
+- **Cron job not firing** – Confirm cron files in `${TOOLHUB_BASEDIR}/toolhub/cron.d` end with a newline and use absolute paths or paths relative to `/shared`.
 
 ## Development
 - Install Node dependencies for the MCP server: `npm install`.
@@ -431,7 +411,7 @@ npm run mcp:dev -- --list-tools | jq '.[0:5]'
   - `scripts/` – Operational shell/Python tools mounted into the container at runtime.
 
 ## Versioning & Changelog
-- Current release: **0.1 (2025-07-11)** as documented in prior README.
+- Current release: **0.1.3** (see `VERSION` and `CHANGELOG.md`).
 - Container releases are published to `ghcr.io/wirrockendigital/toolhub` via `.github/workflows/docker-release.yml` on `v*` tags.
 - TODO: Document formal changelog/versioning strategy (e.g., semantic releases or conventional commits).
 

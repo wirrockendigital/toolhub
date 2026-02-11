@@ -1,23 +1,22 @@
 #!/usr/bin/env python3
 #==MCP==
 # {
-#   "description": "Transcribe an audio file via Whisper CLI or OpenAI transcription API.",
+#   "description": "Transcribe an audio file via local Whisper CLI.",
 #   "schema": {
 #     "type": "object",
 #     "properties": {
 #       "input": { "type": "string", "description": "Input audio path (absolute or relative to TRANSCRIPT_INPUT_ROOT)." },
 #       "output": { "type": "string", "description": "Optional output path (absolute or relative to TRANSCRIPT_OUTPUT_ROOT)." },
 #       "format": { "type": "string", "enum": ["json", "txt"] },
-#       "backend": { "type": "string", "enum": ["auto", "whisper-cli", "openai"] },
+#       "backend": { "type": "string", "enum": ["auto", "whisper-cli"] },
 #       "language": { "type": "string", "description": "Optional language code (for example de, en)." },
-#       "model": { "type": "string", "description": "Optional backend model name." },
-#       "temperature": { "type": "number", "description": "Optional decoding temperature." }
+#       "model": { "type": "string", "description": "Optional backend model name." }
 #     },
 #     "required": ["input"]
 #   }
 # }
 #==/MCP==
-"""Transcribe audio files using Whisper CLI or OpenAI transcription API.
+"""Transcribe audio files using local Whisper CLI.
 
 This script is designed for Toolhub automation flows and writes structured logs
 under /logs. It accepts an input audio path, chooses an available backend,
@@ -33,13 +32,10 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-import requests
-
 LOG_PATH = os.getenv("TRANSCRIPT_LOG_PATH", "/logs/transcript.log")
 LOG_LEVEL = os.getenv("TRANSCRIPT_LOG_LEVEL", "INFO").upper()
 DEFAULT_INPUT_ROOT = Path(os.getenv("TRANSCRIPT_INPUT_ROOT", "/shared/audio/in"))
 DEFAULT_OUTPUT_ROOT = Path(os.getenv("TRANSCRIPT_OUTPUT_ROOT", "/shared/audio/out/transcripts"))
-OPENAI_TRANSCRIBE_URL = os.getenv("OPENAI_TRANSCRIBE_URL", "https://api.openai.com/v1/audio/transcriptions")
 
 LOGGER = logging.getLogger("transcript")
 
@@ -135,34 +131,6 @@ def run_whisper_cli(input_path: Path, language: str | None, model: str | None) -
         return json.loads(transcript_file.read_text(encoding="utf-8"))
 
 
-def run_openai_transcription(input_path: Path, language: str | None, model: str | None, temperature: float | None) -> dict:
-    """Run OpenAI transcription endpoint and return JSON response."""
-    api_key = os.getenv("OPENAI_API_KEY", "").strip()
-    if not api_key:
-        raise RuntimeError("OPENAI_API_KEY is required for OpenAI transcription backend.")
-
-    payload = {
-        "model": model or os.getenv("OPENAI_TRANSCRIPTION_MODEL", "gpt-4o-mini-transcribe"),
-        "response_format": "verbose_json",
-    }
-    if language:
-        payload["language"] = language
-    if temperature is not None:
-        payload["temperature"] = str(temperature)
-
-    headers = {"Authorization": f"Bearer {api_key}"}
-
-    LOGGER.info("Executing OpenAI transcription request")
-    with input_path.open("rb") as audio_file:
-        files = {"file": (input_path.name, audio_file, "application/octet-stream")}
-        response = requests.post(OPENAI_TRANSCRIBE_URL, headers=headers, data=payload, files=files, timeout=600)
-
-    if response.status_code >= 400:
-        raise RuntimeError(f"OpenAI transcription request failed ({response.status_code}): {response.text}")
-
-    return response.json()
-
-
 def extract_text(result: dict) -> str:
     """Extract normalized text from backend results."""
     text = result.get("text")
@@ -173,27 +141,24 @@ def extract_text(result: dict) -> str:
 
 def choose_backend(requested_backend: str) -> str:
     """Select transcription backend based on availability and user preference."""
-    if requested_backend in {"whisper-cli", "openai"}:
+    if requested_backend == "whisper-cli":
         return requested_backend
 
     if shutil.which("whisper"):
         return "whisper-cli"
-    if os.getenv("OPENAI_API_KEY", "").strip():
-        return "openai"
 
-    raise RuntimeError("No transcription backend available. Install Whisper CLI or configure OPENAI_API_KEY.")
+    raise RuntimeError("No transcription backend available. Install Whisper CLI.")
 
 
 def main() -> int:
     """CLI entrypoint for transcription automation."""
-    parser = argparse.ArgumentParser(description="Transcribe audio with Whisper CLI or OpenAI API.")
+    parser = argparse.ArgumentParser(description="Transcribe audio with local Whisper CLI.")
     parser.add_argument("--input", required=True, help="Input audio path (absolute or relative to /shared/audio/in).")
     parser.add_argument("--output", help="Output path (absolute or relative to /shared/audio/out/transcripts).")
     parser.add_argument("--format", choices=["json", "txt"], default="json", help="Output format.")
-    parser.add_argument("--backend", choices=["auto", "whisper-cli", "openai"], default="auto", help="Transcription backend.")
+    parser.add_argument("--backend", choices=["auto", "whisper-cli"], default="auto", help="Transcription backend.")
     parser.add_argument("--language", help="Optional language code (for example de, en).")
     parser.add_argument("--model", help="Optional backend model name.")
-    parser.add_argument("--temperature", type=float, help="Optional decoding temperature.")
     args = parser.parse_args()
 
     configure_logging()
@@ -203,10 +168,7 @@ def main() -> int:
         backend = choose_backend(args.backend)
         output_path = resolve_output_path(input_path, args.output, args.format)
 
-        if backend == "whisper-cli":
-            result = run_whisper_cli(input_path, args.language, args.model)
-        else:
-            result = run_openai_transcription(input_path, args.language, args.model, args.temperature)
+        result = run_whisper_cli(input_path, args.language, args.model)
 
         if args.format == "json":
             output_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
