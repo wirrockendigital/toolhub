@@ -54,5 +54,6 @@ html2text             # HTML to Markdown conversion
 markdownify           # HTML to Markdown converter
 pypandoc              # Universal document converter
 pdfminer.six          # PDF text extraction
-python-docx           # Read/write Word documents
+python-docx==1.1.0    # Read/write Word documents
+docxtpl==0.16.7       # DOCX templating for report generation
 # textract              # Unified document text extractor

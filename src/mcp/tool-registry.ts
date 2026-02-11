@@ -1,5 +1,6 @@
 import { promises as fs, constants as fsConstants, Dirent } from "node:fs";
 import path from "node:path";
+import process from "node:process";
 import { z } from "zod";
 import { McpConfig } from "./config.js";
 import { discoverScripts, ScriptToolDefinition } from "./discovery.js";
@@ -64,8 +65,9 @@ export async function createToolRegistry(config: McpConfig): Promise<RegisteredT
   const discoveredTools = scripts.map((tool) => createScriptTool(tool, config, rateLimiter));
   const cliTools = await createCliTools(config, rateLimiter);
   const handcrafted = await createHandcraftedTools(config, rateLimiter, scriptMap);
+  const docxTemplateFill = await createDocxTemplateFillTool(config, rateLimiter);
 
-  return [...discoveredTools, ...cliTools, ...handcrafted];
+  return [...discoveredTools, ...cliTools, ...handcrafted, ...docxTemplateFill];
 }
 
 function createScriptTool(tool: ScriptToolDefinition, config: McpConfig, limiter: RateLimiter): RegisteredTool {
@@ -339,6 +341,92 @@ async function createHandcraftedTools(
   return tools;
 }
 
+async function createDocxTemplateFillTool(config: McpConfig, limiter: RateLimiter): Promise<RegisteredTool[]> {
+  if (!(await hasExecutable("python3"))) {
+    return [];
+  }
+
+  const templatePattern = /^[A-Za-z0-9_.-]+\.docx$/i;
+  const filenamePattern = /^[A-Za-z0-9_-]+\.docx$/i;
+  const subdirPattern = /^[A-Za-z0-9_\-/]*$/;
+
+  const schema: ToolInputSchema = {
+    zod: z.object({
+      template: z
+        .string()
+        .refine((value) => templatePattern.test(value), "template must be a .docx filename without path separators."),
+      data: z.record(z.string()),
+      output_subdir: z
+        .string()
+        .optional()
+        .refine((value) => value === undefined || subdirPattern.test(value), {
+          message: "output_subdir may only contain letters, digits, '_', '-', '/'.",
+        })
+        .refine((value) => value === undefined || (!value.startsWith("/") && !value.includes("..")), {
+          message: "output_subdir must be relative and must not include '..'.",
+        }),
+      output_filename: z
+        .string()
+        .refine((value) => filenamePattern.test(value), "output_filename must be a .docx filename without slashes."),
+    }),
+    json: {
+      type: "object",
+      properties: {
+        template: {
+          type: "string",
+          description: "DOCX template filename located under /templates.",
+          pattern: templatePattern.source,
+        },
+        data: {
+          type: "object",
+          description: "Placeholder mapping used by docxtpl.",
+          additionalProperties: { type: "string" },
+        },
+        output_subdir: {
+          type: "string",
+          description: "Relative subdirectory under /output.",
+          pattern: subdirPattern.source,
+        },
+        output_filename: {
+          type: "string",
+          description: "Destination filename ending with .docx (no slashes).",
+          pattern: filenamePattern.source,
+        },
+      },
+      required: ["template", "data", "output_filename"],
+    },
+  };
+
+  const tool: RegisteredTool = {
+    name: "docx-template-fill.fill_docx_template",
+    description: "Load a DOCX template, fill placeholders with data, and write to /output/.",
+    schema,
+    handler: async (input: unknown) => {
+      limiter.check("docx-template-fill");
+      const parsed = schema.zod.parse(input ?? {});
+      const payload = JSON.stringify(parsed);
+      const tmpDir = await fs.mkdtemp(path.join("/tmp", "docx-template-fill-"));
+      const payloadPath = path.join(tmpDir, "payload.json");
+
+      await fs.writeFile(payloadPath, payload, "utf8");
+
+      try {
+        const result = await runCommand(
+          "docx-template-fill",
+          "python3",
+          ["-m", "mcp_tools.docx_template_fill.tool", "--payload-file", payloadPath],
+          config,
+          { cwd: process.cwd() },
+        );
+        return { ...result };
+      } finally {
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
+    },
+  };
+
+  return [tool];
+}
 async function loadManifestTools(config: McpConfig, limiter: RateLimiter): Promise<RegisteredTool[]> {
   const results: RegisteredTool[] = [];
   const baseDir = path.resolve(process.cwd(), "tools");
