@@ -141,39 +141,44 @@ Make sure the container making the request is part of the same Docker network.
 
 ### 3.2. Request Format
 
-- **Content-Type:** `multipart/form-data`
+- **Content-Type:** `application/json`
 - **Fields:**
-  - `file` (file): The audio file to split.
-  - `mode` (text): `fixed` or `silence`.
-  - `chunk_length` (text): Maximum segment length in seconds.
-  - `silence_seek` (text, optional): Seek window before chunk end (only `silence`).
-  - `silence_duration` (text, optional): Minimum silence duration (only `silence`).
-  - `silence_threshold` (text, optional): Silence threshold in dB (only `silence`).
-  - `padding` (text, optional): Padding before cut point (only `silence`).
+  - `filename` (string, required): File name that must already exist in `/shared/audio/in`.
+  - `mode` (string, required): `fixed` or `silence`.
+  - `chunk_length` (number, required): Maximum segment length in seconds.
+  - `silence_seek` (number, optional): Seek window before chunk end (only `silence`).
+  - `silence_duration` (number, optional): Minimum silence duration (only `silence`).
+  - `silence_threshold` (number, optional): Silence threshold in dB (only `silence`).
+  - `padding` (number, optional): Padding before cut point (only `silence`).
+  - `enhance` (boolean, optional): Apply generic enhancement filters.
+  - `enhance_speech` (boolean, optional): Apply speech-optimized filters.
 
 ### 3.3. Response
 
 - **Success (200):**  
-  Returns a ZIP archive containing all split segments.  
-  - **Headers:**
-    - `Content-Type: application/zip`
-    - `Content-Disposition: attachment; filename="split-audio-<job_id>.zip"`
+  Returns JSON with:
+  - `job_id`
+  - `output_dir`
+  - `files` (array with generated chunk file names)
 
 - **Error (4xx/5xx):**  
-  Returns JSON with an `error` message.
+  Returns JSON with an `error` message and, depending on failure type, additional details.
 
 ### 3.4. Example using `curl`
 
 ```bash
 curl -X POST http://NAS_IP:5656/audio-split \
-  -F "file=@/path/to/session.m4a" \
-  -F "mode=silence" \
-  -F "chunk_length=600" \
-  -F "silence_seek=60" \
-  -F "silence_duration=0.5" \
-  -F "silence_threshold=-30" \
-  -F "padding=0.2" \
-  --output split-results.zip
+  -H "Content-Type: application/json" \
+  -d '{
+    "filename": "session.m4a",
+    "mode": "silence",
+    "chunk_length": 600,
+    "silence_seek": 60,
+    "silence_duration": 0.5,
+    "silence_threshold": -30,
+    "padding": 0.2,
+    "enhance_speech": true
+  }'
 ```
 
 ### 2.5 SSH Usage

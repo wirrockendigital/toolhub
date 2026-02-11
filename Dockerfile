@@ -55,8 +55,8 @@ RUN apt-get install -y --no-install-recommends bc                            # C
 RUN apt-get update && apt-get install -y --no-install-recommends wakeonlan && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Fix fd symlink (fd-find on Debian/Ubuntu)
-RUN ln -s $(which fdfind) /usr/local/bin/fd
+# Create an fd compatibility symlink only when fdfind is installed.
+RUN if command -v fdfind >/dev/null 2>&1; then ln -sf "$(command -v fdfind)" /usr/local/bin/fd; fi
 
 # Python dependencies
 COPY requirements.txt /tmp/requirements.txt

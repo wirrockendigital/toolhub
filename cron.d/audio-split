@@ -2,8 +2,9 @@ SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 
 # Daily audio-split at 03:00
+# Use explicit flags that match the current audio-split.sh interface.
 0 3 * * * toolhubuser cd /shared && \
   for f in audio/in/*.m4a; do \
     [ -f "$f" ] && job=$(basename "$f" .m4a) && \
-    /scripts/audio-split.sh "$f" "audio/out/$job"; \
+    /scripts/audio-split.sh --mode fixed --chunk-length 600 --input "$f" --output "audio/out/$job"; \
   done

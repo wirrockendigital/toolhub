@@ -2,15 +2,11 @@
 
 from __future__ import annotations
 
+# Keep import declarations single to avoid syntax errors with future imports.
 import logging
 import os
 from pathlib import Path
-from __future__ import annotations
-
-import logging
-import os
-from pathlib import Path
-from typing import Any, Dict, Set, Tuple, Type
+from typing import Dict, Set, Tuple, Type
 
 from .validators import (
     validate_data_mapping,
