@@ -16,6 +16,7 @@ import logging
 import os
 import sys
 import json
+from pathlib import Path
 from werkzeug.utils import secure_filename
 import uuid
 from werkzeug.exceptions import HTTPException
@@ -42,8 +43,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logger.debug(f"Environment variables: {dict(os.environ)}")
 
-# Resolve Python tool root; fall back to current working directory for local runs.
-TOOLS_ROOT = os.getenv("TOOLHUB_PYTHON_ROOT", "/workspace")
+# Resolve Python tool root from env, image defaults, or local working directory.
+TOOLS_ROOT = os.getenv("TOOLHUB_PYTHON_ROOT", "/opt/toolhub")
+if not os.path.isdir(TOOLS_ROOT) and os.path.isdir("/workspace"):
+    TOOLS_ROOT = "/workspace"
 if not os.path.isdir(TOOLS_ROOT):
     TOOLS_ROOT = os.getcwd()
 if TOOLS_ROOT not in sys.path:
@@ -56,6 +59,7 @@ except Exception as exc:  # noqa: BLE001
     logger.exception("Failed to import tool registry", exc_info=exc)
 
 MANIFEST_TOOLS_DIR = os.getenv("TOOLHUB_MANIFEST_TOOLS_DIR", os.path.join(TOOLS_ROOT, "tools"))
+SCRIPT_TOOLS_DIR = os.getenv("TOOLHUB_SCRIPT_TOOLS_DIR", "/scripts")
 
 
 def load_manifest_tools():
@@ -109,6 +113,66 @@ def load_manifest_tools():
 
 # Load manifests once at startup; runtime requests only execute already discovered tools.
 MANIFEST_TOOLS = load_manifest_tools()
+
+
+def _normalise_tool_token(value):
+    """Normalise tool identifiers to a lowercase underscore format."""
+    return str(value).strip().lower().replace("-", "_")
+
+
+def _flag_name(key):
+    """Convert payload keys into CLI flag names."""
+    return str(key).strip().replace("_", "-")
+
+
+def _resolve_script_tools_dir():
+    """Resolve script directory for container and local-dev execution contexts."""
+    preferred = Path(SCRIPT_TOOLS_DIR)
+    if preferred.is_dir():
+        return preferred
+    fallback = Path.cwd() / "scripts"
+    if fallback.is_dir():
+        return fallback
+    return preferred
+
+
+def load_script_tools():
+    """Load executable script tools from the script directory."""
+    script_tools = {}
+    base_dir = _resolve_script_tools_dir()
+    if not base_dir.is_dir():
+        logger.info(f"Script tool directory not found: {base_dir}")
+        return script_tools
+
+    for entry in sorted(base_dir.iterdir(), key=lambda item: item.name):
+        if not entry.is_file():
+            continue
+        if not os.access(entry, os.X_OK):
+            continue
+        if entry.suffix not in (".sh", ".py"):
+            continue
+        if entry.name == "webhook.py":
+            continue
+
+        stem_token = _normalise_tool_token(entry.stem)
+        extension_prefix = "sh" if entry.suffix == ".sh" else "py"
+        canonical = f"{extension_prefix}_{stem_token}"
+
+        script_tools[canonical] = {
+            "name": canonical,
+            "path": str(entry),
+            "kind": extension_prefix,
+        }
+        # Keep filename aliases for more ergonomic webhook calls.
+        script_tools[_normalise_tool_token(entry.name)] = script_tools[canonical]
+        script_tools[stem_token] = script_tools[canonical]
+
+    logger.info(f"Loaded {len(script_tools)} script tool alias(es) from {base_dir}")
+    return script_tools
+
+
+# Load script tools once at startup; webhook requests only execute discovered scripts.
+SCRIPT_TOOLS = load_script_tools()
 
 
 def build_manifest_args(request_data, manifest):
@@ -191,6 +255,100 @@ def execute_manifest_tool(tool_name, manifest, request_data):
     return jsonify({"status": "ok", "tool": tool_name, "stdout": stdout_text, "stderr": stderr_text}), 200
 
 
+def build_script_args(request_data):
+    """Build script arguments from args[] or payload key/value flags."""
+    raw_args = request_data.get("args")
+    if raw_args is not None:
+        if not isinstance(raw_args, list):
+            raise ValueError("'args' must be an array when provided.")
+        return [str(item) for item in raw_args]
+
+    payload = request_data.get("payload")
+    if payload is None:
+        # Allow top-level fields for lightweight clients that skip nested payload objects.
+        payload = {
+            key: value
+            for key, value in request_data.items()
+            if key not in {"tool", "payload", "args"}
+        }
+    elif not isinstance(payload, dict):
+        raise ValueError("'payload' must be an object when provided.")
+
+    if not isinstance(payload, dict):
+        return []
+
+    args = []
+    for key, value in payload.items():
+        if value is None:
+            continue
+        flag = f"--{_flag_name(key)}"
+        if isinstance(value, bool):
+            if value:
+                args.append(flag)
+            continue
+        # Preserve nested payload objects by forwarding valid JSON strings.
+        if isinstance(value, dict):
+            args.extend([flag, json.dumps(value, ensure_ascii=False)])
+            continue
+        if isinstance(value, list):
+            # Forward primitive lists as repeated flags; fallback to JSON for complex members.
+            if any(isinstance(item, (dict, list)) for item in value):
+                args.extend([flag, json.dumps(value, ensure_ascii=False)])
+                continue
+            for item in value:
+                if item is None:
+                    continue
+                args.extend([flag, str(item)])
+            continue
+        args.extend([flag, str(value)])
+    return args
+
+
+def execute_script_tool(tool_name, tool, request_data):
+    """Execute discovered scripts with webhook-provided args or payload."""
+    args = build_script_args(request_data)
+    script_path = tool["path"]
+
+    if tool["kind"] == "py":
+        cmd = ["python3", script_path, *args]
+    else:
+        cmd = ["bash", script_path, *args]
+
+    logger.info(f"Executing script tool '{tool_name}': {' '.join(cmd)}")
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=600)
+    except subprocess.TimeoutExpired as exc:
+        logger.exception(f"Script tool timeout: {tool_name}")
+        return jsonify({"status": "error", "tool": tool_name, "error": {"type": "TimeoutExpired", "message": str(exc)}}), 504
+
+    stdout_text = (result.stdout or "").strip()
+    stderr_text = (result.stderr or "").strip()
+
+    parsed_stdout = None
+    if stdout_text:
+        try:
+            parsed_stdout = json.loads(stdout_text)
+        except Exception:  # noqa: BLE001
+            parsed_stdout = None
+
+    if result.returncode != 0:
+        return jsonify(
+            {
+                "status": "error",
+                "tool": tool_name,
+                "exit_code": result.returncode,
+                "stdout": stdout_text,
+                "stderr": stderr_text,
+                "result": parsed_stdout if isinstance(parsed_stdout, dict) else None,
+            }
+        ), 400
+
+    if isinstance(parsed_stdout, dict):
+        return jsonify(parsed_stdout), 200
+
+    return jsonify({"status": "ok", "tool": tool_name, "stdout": stdout_text, "stderr": stderr_text}), 200
+
+
 app = Flask(__name__)
 
 # Detailed request/response logging with timing
@@ -232,7 +390,7 @@ def index():
             "/":           "This help message",
             "/test":       "GET or POST health-check",
             "/audio-split":"POST JSON {filename, mode, …} → split audio from /shared",
-            "/run":        "POST JSON {tool, payload|args} → run Python or manifest Toolhub tool"
+            "/run":        "POST JSON {tool, payload|args} → run Python, manifest, or script tool"
         }
     }), 200
 
@@ -251,6 +409,8 @@ def test():
 @app.route("/run", methods=["POST"])
 def run_tool():
     payload = request.get_json(force=True)
+    if not isinstance(payload, dict):
+        return jsonify({"error": "request body must be a JSON object"}), 400
 
     tool_name = payload.get("tool") if isinstance(payload, dict) else None
     tool_payload = payload.get("payload") if isinstance(payload, dict) else {}
@@ -296,8 +456,22 @@ def run_tool():
             logger.exception("Manifest tool execution failed", exc_info=exc)
             return jsonify({"status": "error", "tool": tool_name, "error": {"type": exc.__class__.__name__, "message": str(exc)}}), 500
 
+    normalised_tool_name = _normalise_tool_token(tool_name)
+    if normalised_tool_name in SCRIPT_TOOLS:
+        try:
+            return execute_script_tool(normalised_tool_name, SCRIPT_TOOLS[normalised_tool_name], payload)
+        except ValueError as exc:
+            logger.warning(f"Invalid script tool request for '{tool_name}': {exc}")
+            return jsonify({"status": "error", "tool": tool_name, "error": {"type": "ValidationError", "message": str(exc)}}), 400
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Script tool execution failed", exc_info=exc)
+            return jsonify({"status": "error", "tool": tool_name, "error": {"type": exc.__class__.__name__, "message": str(exc)}}), 500
+
     logger.warning(f"Requested unknown tool: {tool_name}")
-    return jsonify({"error": f"Unknown tool '{tool_name}'"}), 404
+    return jsonify({
+        "error": f"Unknown tool '{tool_name}'",
+        "hint": "Use / (index) to inspect endpoints and ensure the tool exists in Python registry, manifest tools, or /scripts."
+    }), 404
 
 
 # --- AUDIO SPLIT ENDPOINT ---

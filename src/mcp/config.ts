@@ -31,7 +31,7 @@ export interface McpConfig {
 
 const DEFAULTS = {
   SAFE_MODE: true,
-  ALLOWLIST_PATHS: ["/data", "/tmp"],
+  ALLOWLIST_PATHS: ["/data", "/tmp", "/shared", "/logs", "/app"],
   ALLOWLIST_HOSTS: ["localhost", "127.0.0.1"],
   COMMAND_TIMEOUT_MS: 120_000,
   MAX_OUTPUT: 20_000,

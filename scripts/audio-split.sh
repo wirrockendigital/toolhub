@@ -1,4 +1,25 @@
 #!/bin/bash
+#==MCP==
+# {
+#   "description": "Split an audio file by fixed interval or silence detection using ffmpeg.",
+#   "schema": {
+#     "type": "object",
+#     "properties": {
+#       "mode": { "type": "string", "enum": ["fixed", "silence"] },
+#       "chunk_length": { "type": "number", "description": "Target chunk length in seconds." },
+#       "input": { "type": "string", "description": "Input file path (absolute or relative to /shared/audio/in)." },
+#       "output": { "type": "string", "description": "Optional output directory path." },
+#       "silence_seek": { "type": "number", "description": "Backward seek window in seconds for silence matching." },
+#       "silence_duration": { "type": "number", "description": "Minimum silence duration in seconds." },
+#       "silence_threshold": { "type": "number", "description": "Silence threshold in dB." },
+#       "padding": { "type": "number", "description": "Padding in seconds before selected split point." },
+#       "enhance": { "type": "boolean", "description": "Enable generic enhancement filter chain." },
+#       "enhance_speech": { "type": "boolean", "description": "Enable speech-focused enhancement filter chain." }
+#     },
+#     "required": ["mode", "chunk_length", "input"]
+#   }
+# }
+#==/MCP==
 set -euo pipefail
 LOGFILE="/logs/audio-split.log"
 # Ensure log directories exist
