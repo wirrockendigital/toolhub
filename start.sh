@@ -83,7 +83,10 @@ if [[ ! -f "$TOOLHUB_PROJECT_ROOT/scripts/.initialized" || -z "$(ls -A "$TOOLHUB
   echo "[INIT] First-time bootstrap: copying default content into project root..."
   cp -r "$BOOTSTRAP_SRC/scripts/." "$TOOLHUB_PROJECT_ROOT/scripts/" || exit 1
   cp -r "$BOOTSTRAP_SRC/cron.d/." "$TOOLHUB_PROJECT_ROOT/cron.d/" || exit 1
-  cp -r "$BOOTSTRAP_SRC/logs/." "$TOOLHUB_PROJECT_ROOT/logs/" || exit 1
+  # Copy default log files only when the bootstrap image content provides them.
+  if [[ -d "$BOOTSTRAP_SRC/logs" ]]; then
+    cp -r "$BOOTSTRAP_SRC/logs/." "$TOOLHUB_PROJECT_ROOT/logs/" || exit 1
+  fi
   touch "$TOOLHUB_PROJECT_ROOT/scripts/.initialized"
 else
   echo "[INIT] Scripts already initialized in project root – skipping bootstrap copy"

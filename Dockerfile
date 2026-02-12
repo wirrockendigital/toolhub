@@ -76,7 +76,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3-gunicor
 # Bootstrap files
 COPY --chown=toolhubuser:user --chmod=755 scripts/ /bootstrap/scripts/
 COPY --chown=toolhubuser:user --chmod=755 cron.d/ /bootstrap/cron.d/
-COPY --chown=toolhubuser:user --chmod=755 logs/ /bootstrap/logs/
 COPY --chown=toolhubuser:user --chmod=755 start.sh /start.sh
 
 # Cleanup Windows line endings
