@@ -1,0 +1,41 @@
+{
+  "name": "Toolhub Community DOCX Render Demo",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "6554fd4f-cbf8-4871-a6f0-e90bf9be5f21",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-300, 220]
+    },
+    {
+      "parameters": {
+        "template": "example.docx",
+        "outputName": "example-output.docx",
+        "dataJson": "{\"NAME\": \"Toolhub\"}"
+      },
+      "id": "57d1f665-ae5c-48f8-884d-f7290956a113",
+      "name": "Toolhub DOCX Render",
+      "type": "n8n-nodes-toolhub.toolhubDocxRender",
+      "typeVersion": 1,
+      "position": [-60, 220]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Toolhub DOCX Render",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

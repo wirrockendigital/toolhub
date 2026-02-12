@@ -1,0 +1,43 @@
+{
+  "name": "Toolhub Community Audio Split Demo",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "7cf9c6a9-f0c2-47f2-a7d7-0a796ec85ff1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-320, 200]
+    },
+    {
+      "parameters": {
+        "binaryPropertyName": "audio",
+        "outputBinaryPropertyName": "audioChunk",
+        "splitMode": "hard",
+        "chunkLengthSeconds": 600,
+        "enhanceSpeech": true
+      },
+      "id": "67857611-c9b0-4a9f-86c2-018eb0f9ea73",
+      "name": "Toolhub Audio Split",
+      "type": "n8n-nodes-toolhub.toolhubAudioSplit",
+      "typeVersion": 1,
+      "position": [-80, 200]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Toolhub Audio Split",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,618 @@
+{
+  "name": "iOS Audio -> Toolhub Ingest Split -> OpenAI -> Notion (0 JS Nodes)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ios-audio-ingest",
+        "responseMode": "responseNode",
+        "options": {
+          "binaryData": true
+        }
+      },
+      "id": "7fc6d0e5-4b7a-4708-8f4a-0f0a53ecab41",
+      "name": "Ingress Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1540,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{($env.TOOLHUB_BASE_URL || 'http://toolhub:5656') + '/audio-ingest-split'}}",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "audio",
+              "parameterType": "formBinaryData",
+              "inputDataFieldName": "audio"
+            },
+            {
+              "name": "recordingId",
+              "value": "={{$json.recordingId || ''}}"
+            },
+            {
+              "name": "title",
+              "value": "={{$json.title || ''}}"
+            },
+            {
+              "name": "source",
+              "value": "={{$json.source || ''}}"
+            },
+            {
+              "name": "language",
+              "value": "={{$json.language || 'de'}}"
+            },
+            {
+              "name": "capturedAt",
+              "value": "={{$json.capturedAt || ''}}"
+            },
+            {
+              "name": "mode",
+              "value": "fixed"
+            },
+            {
+              "name": "chunk_length",
+              "value": "600"
+            },
+            {
+              "name": "enhance_speech",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "31ea2133-13eb-42bf-b4e2-f7a516f72fd5",
+      "name": "Toolhub Ingest Split",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1300,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "chunks",
+        "include": "allOtherFields",
+        "options": {
+          "destinationFieldName": "chunk"
+        }
+      },
+      "id": "f7db6f79-75c3-4f2b-b8ed-32a7a9fab476",
+      "name": "Split Chunks",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -1060,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ ({ recordingId: $json.recordingId, toolhubJobId: $json.jobId, title: $json.meta?.title || '', source: $json.meta?.source || 'ios-webhook', language: $json.meta?.language || 'de', capturedAt: $json.meta?.capturedAt || '', ingestFilename: $json.ingest?.filename || '', ingestPath: $json.ingest?.path || '', chunkIndex: Number($json.chunk?.index || 0), chunkFilename: $json.chunk?.filename || '', chunkPath: $json.chunk?.path || '', chunkDownloadUrl: $json.chunk?.downloadUrl || '', chunkMimeType: $json.chunk?.mimeType || 'application/octet-stream', chunkCount: Number(Array.isArray($json.chunks) ? $json.chunks.length : 1) }) }}",
+        "options": {}
+      },
+      "id": "c0671b2c-d902-4609-9ced-4cc5f5cd50b0",
+      "name": "Set Chunk Context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -820,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$json.chunkDownloadUrl}}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "00e0a496-f982-48d8-80d9-6017f8f7ae3c",
+      "name": "Download Chunk",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -580,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "binaryPropertyName": "data",
+        "options": {
+          "language": "={{$json.language || 'de'}}"
+        }
+      },
+      "id": "4ae63065-a45d-4f43-866c-cf1fbf3b055e",
+      "name": "OpenAI Transcribe Chunk",
+      "type": "n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        -340,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "b9736e59-e66d-49ab-b5af-f6f6f497fd80",
+      "name": "Merge Transcript Context",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -90,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ ({ recordingId: $json.Input1?.recordingId || '', title: $json.Input1?.title || '', source: $json.Input1?.source || 'ios-webhook', language: $json.Input1?.language || 'de', capturedAt: $json.Input1?.capturedAt || '', toolhubJobId: $json.Input1?.toolhubJobId || '', ingestFilename: $json.Input1?.ingestFilename || '', ingestPath: $json.Input1?.ingestPath || '', chunkIndex: Number($json.Input1?.chunkIndex || 0), chunkFilename: $json.Input1?.chunkFilename || '', chunkPath: $json.Input1?.chunkPath || '', chunkCount: Number($json.Input1?.chunkCount || 1), transcriptPart: String($json.Input2?.text ?? $json.Input2?.transcript ?? $json.Input2?.output_text ?? $json.Input2?.output?.[0]?.content?.[0]?.text ?? '').trim() }) }}",
+        "options": {}
+      },
+      "id": "803efb0f-1475-4f11-bdd6-3775061ef3f5",
+      "name": "Set Transcript Row",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        150,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "sortFieldsUi": {
+          "sortField": [
+            {
+              "fieldName": "chunkIndex",
+              "order": "ascending"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ec638e0e-ddd7-49f4-b98a-fe8df1f39f46",
+      "name": "Sort Chunks",
+      "type": "n8n-nodes-base.sort",
+      "typeVersion": 1,
+      "position": [
+        390,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "chunkRows",
+        "include": "allFields",
+        "options": {}
+      },
+      "id": "306db052-6f13-43d3-bfd9-6ea536cf3c52",
+      "name": "Aggregate Chunk Rows",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        640,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ (() => { const rows = Array.isArray($json.chunkRows) ? $json.chunkRows : []; if (!rows.length) { throw new Error('No chunk transcripts available for reconstruction.'); } const transcript = rows.map((row) => String(row.transcriptPart || '').trim()).filter(Boolean).join('\\n\\n'); if (!transcript) { throw new Error('Chunk transcription returned no usable text.'); } const first = rows[0]; return { recordingId: first.recordingId, title: first.title, source: first.source, language: first.language || 'de', capturedAt: first.capturedAt, toolhubJobId: first.toolhubJobId, chunkCount: rows.length, durationClass: rows.length > 1 ? 'multi' : 'single', transcript, fullTranscript: transcript }; })() }}",
+        "options": {}
+      },
+      "id": "452b7f6b-b104-4079-b5f1-132d6482a92a",
+      "name": "Set Full Transcript",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        900,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "text",
+        "operation": "response",
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-5.2"
+        },
+        "responses": {
+          "values": [
+            {
+              "type": "text",
+              "role": "user",
+              "content": "={{$json.transcript}}"
+            }
+          ]
+        },
+        "simplify": false,
+        "options": {
+          "promptConfig": {
+            "promptOptions": {
+              "promptId": "pmpt_698c7fb03f9881969e81d41faa8b70780705e6b67ad926b7"
+            }
+          },
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          }
+        }
+      },
+      "id": "99b5d5c1-6ded-4f09-82fc-06416f8e579b",
+      "name": "OpenAI Enrichment",
+      "type": "n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        1150,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "7d1a0f84-e9a6-4824-a135-88329384100f",
+      "name": "Merge Enrichment Context",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1400,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ (() => { const context = $json.Input1 || {}; const rawPayload = $json.Input2?.output_text ?? $json.Input2?.output?.[0]?.content?.[0]?.text ?? $json.Input2?.output?.[0]?.content?.find((entry) => entry.type === 'output_text')?.text ?? {}; let parsed = {}; if (typeof rawPayload === 'string') { try { parsed = JSON.parse(rawPayload); } catch (error) { throw new Error(`Failed to parse OpenAI enrichment JSON: ${error.message}`); } } else if (rawPayload && typeof rawPayload === 'object') { parsed = rawPayload; } const normalizeArray = (value) => Array.isArray(value) ? value.map((entry) => String(entry).trim()).filter(Boolean) : []; return { recordingId: context.recordingId, title: context.title, source: context.source, language: context.language, capturedAt: context.capturedAt, toolhubJobId: context.toolhubJobId, chunkCount: context.chunkCount, durationClass: context.durationClass, transcript: context.transcript, fullTranscript: context.fullTranscript, enrichment: { title: String(parsed.title ?? context.title ?? context.recordingId ?? 'Audio Note').trim(), summary: String(parsed.summary ?? '').trim(), key_points: normalizeArray(parsed.key_points), follow_ups: normalizeArray(parsed.follow_ups), action_items: normalizeArray(parsed.action_items), tags: normalizeArray(parsed.tags), risk_flags: normalizeArray(parsed.risk_flags) } }; })() }}",
+        "options": {}
+      },
+      "id": "3d22ebd3-48e9-488d-92c9-40095f7af925",
+      "name": "Set Notion Payload",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1660,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{$env.NOTION_DATABASE_ID}}"
+        },
+        "title": "={{$json.enrichment.title || $json.title || $json.recordingId}}",
+        "simple": false,
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "RecordingId|rich_text",
+              "richText": false,
+              "textContent": "={{$json.recordingId}}"
+            },
+            {
+              "key": "Source|rich_text",
+              "richText": false,
+              "textContent": "={{$json.source || ''}}"
+            },
+            {
+              "key": "CapturedAt|rich_text",
+              "richText": false,
+              "textContent": "={{$json.capturedAt || ''}}"
+            },
+            {
+              "key": "Language|rich_text",
+              "richText": false,
+              "textContent": "={{$json.language || ''}}"
+            },
+            {
+              "key": "DurationClass|rich_text",
+              "richText": false,
+              "textContent": "={{$json.durationClass || ''}}"
+            },
+            {
+              "key": "ChunkCount|number",
+              "numberValue": "={{Number($json.chunkCount || 0)}}"
+            },
+            {
+              "key": "ToolhubJobId|rich_text",
+              "richText": false,
+              "textContent": "={{$json.toolhubJobId || ''}}"
+            },
+            {
+              "key": "Summary|rich_text",
+              "richText": false,
+              "textContent": "={{$json.enrichment.summary || ''}}"
+            },
+            {
+              "key": "FullTranscript|rich_text",
+              "richText": false,
+              "textContent": "={{($json.fullTranscript || '').slice(0, 1900)}}"
+            },
+            {
+              "key": "FollowUps|rich_text",
+              "richText": false,
+              "textContent": "={{Array.isArray($json.enrichment.follow_ups) ? $json.enrichment.follow_ups.join('\\n') : ''}}"
+            },
+            {
+              "key": "ActionItems|rich_text",
+              "richText": false,
+              "textContent": "={{Array.isArray($json.enrichment.action_items) ? $json.enrichment.action_items.join('\\n') : ''}}"
+            },
+            {
+              "key": "KeyPoints|rich_text",
+              "richText": false,
+              "textContent": "={{Array.isArray($json.enrichment.key_points) ? $json.enrichment.key_points.join('\\n') : ''}}"
+            },
+            {
+              "key": "Tags|rich_text",
+              "richText": false,
+              "textContent": "={{Array.isArray($json.enrichment.tags) ? $json.enrichment.tags.join('\\n') : ''}}"
+            },
+            {
+              "key": "RiskFlags|rich_text",
+              "richText": false,
+              "textContent": "={{Array.isArray($json.enrichment.risk_flags) ? $json.enrichment.risk_flags.join('\\n') : ''}}"
+            }
+          ]
+        }
+      },
+      "id": "5f20d9f3-4c2c-4576-b563-f083e4228d16",
+      "name": "Notion Create Page",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1910,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { recordingId: $('Set Notion Payload').first().json.recordingId, status: 'ok', notionPageId: $json.id ?? null } }}",
+        "options": {}
+      },
+      "id": "e15c53b5-54cd-447a-ab80-16f19f2f22de",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [
+        2160,
+        220
+      ]
+    }
+  ],
+  "connections": {
+    "Ingress Webhook": {
+      "main": [
+        [
+          {
+            "node": "Toolhub Ingest Split",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Toolhub Ingest Split": {
+      "main": [
+        [
+          {
+            "node": "Split Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Chunks": {
+      "main": [
+        [
+          {
+            "node": "Set Chunk Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Chunk Context": {
+      "main": [
+        [
+          {
+            "node": "Merge Transcript Context",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Download Chunk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Chunk": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Transcribe Chunk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Transcribe Chunk": {
+      "main": [
+        [
+          {
+            "node": "Merge Transcript Context",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Transcript Context": {
+      "main": [
+        [
+          {
+            "node": "Set Transcript Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Transcript Row": {
+      "main": [
+        [
+          {
+            "node": "Sort Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sort Chunks": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Chunk Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Chunk Rows": {
+      "main": [
+        [
+          {
+            "node": "Set Full Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Full Transcript": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Enrichment",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Enrichment Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Enrichment": {
+      "main": [
+        [
+          {
+            "node": "Merge Enrichment Context",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Enrichment Context": {
+      "main": [
+        [
+          {
+            "node": "Set Notion Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Notion Payload": {
+      "main": [
+        [
+          {
+            "node": "Notion Create Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion Create Page": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  },
+  "active": false,
+  "versionId": "0f4639a5-3150-4fc3-8ff3-fd5706de0f5a",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "pinData": {},
+  "id": "UigMuoLhFutw6P5d",
+  "tags": [
+    {
+      "name": "n8n"
+    },
+    {
+      "name": "toolhub"
+    },
+    {
+      "name": "notion"
+    }
+  ]
+}

@@ -1,24 +1,27 @@
 # Toolhub Feature Contract
 
-This document lists the currently available Toolhub features, where they can be called, and exact invocation examples.
+Dieses Dokument beschreibt die aktuell unterstützten Features und deren Interfaces.
 
 ## Interfaces
 
-- `SSH`: Direct shell invocation inside the Toolhub container (or via `docker exec`).
-- `Webhook`: HTTP calls against `POST /audio-split` and `POST /run`.
-- `MCP`: Tool invocation through the MCP sidecar.
+- `SSH`: Direkter Script-Aufruf im Container
+- `Webhook`: HTTP gegen `scripts/webhook.py`
+- `MCP`: MCP-Toolaufrufe über den Sidecar-Server
+- `n8n Community Nodes`: `n8n-nodes-toolhub` (öffentlich installierbar)
 
 ## Feature Matrix
 
-| Feature | SSH | Webhook | MCP | Notes |
-|---|---|---|---|---|
-| Healthcheck | - | `GET /test` | - | Returns `{"status":"ok"}`. |
-| Audio split | `scripts/audio-split.sh` | `/audio-split` and `/run` script-dispatch | `sh_audio_split` | Requires input file under `/shared/audio/in` (or absolute path). |
-| DOCX render | `scripts/docx-render.py` | `/run` tool: `docx-render` or `docx_render` | `py_docx_render` | Reads templates from `/data/templates`, writes to `/data/output`. |
-| DOCX template fill | `scripts/docx-template-fill.py` | `/run` tool: `docx-template-fill` or `docx_template_fill` | `docx-template-fill.fill_docx_template`, `py_docx_template_fill` | Reads templates from `/templates`, writes to `/output`. |
-| Wake-on-LAN | `scripts/wol-cli.sh` | `/run` tool: `wol-cli`, `wol_cli` | `sh_wol_cli`, `wol-cli` | Sends magic packet by MAC or configured device alias. |
-| Cleanup | `scripts/cleanup.py` | `/run` tool: `cleanup` | `py_cleanup` | Supports safe preview with `--dry-run`. |
-| Transcript | `scripts/transcript.py` | `/run` tool: `transcript` | `py_transcript` | Needs local `whisper` CLI backend. |
+| Feature | SSH | Webhook | MCP | n8n Community Node | Notes |
+|---|---|---|---|---|---|
+| Healthcheck | - | `GET /test` | - | - | `{"status":"ok"}` |
+| Audio split (n8n upload-first) | - | `POST /n8n_audio_split` | - | `Toolhub Audio Split` | Multipart upload + sortiertes Chunk-Manifest |
+| Audio chunk download | - | `GET /audio-chunk/<job_id>/<filename>` | - | intern von `Toolhub Audio Split` | Binary-Download pro Chunk |
+| Audio split (compat) | `scripts/audio-split.sh` | `POST /audio-split` | `sh_audio_split` | `Toolhub Audio Split Compat` | Datei muss in `/shared/audio/in` liegen |
+| Transcript (lokal) | `scripts/transcript.py` | `/run` (`n8n_audio_transcript_local`) | `py_transcript` | `Toolhub Audio Transcript Local` | Nutzt lokalen Whisper-CLI-Backend |
+| Cleanup | `scripts/cleanup.py` | `/run` (`n8n_audio_cleanup`) | `py_cleanup` | `Toolhub Audio Cleanup` | Unterstützt `--dry-run` |
+| Wake-on-LAN | `scripts/wol-cli.sh` | `/run` (`n8n_wol`) | `sh_wol_cli`, `wol-cli` | `Toolhub WOL` | Magic Packet per MAC oder Alias |
+| DOCX render | `scripts/docx-render.py` | `/run` (`n8n_docx_render`) | `py_docx_render` | `Toolhub DOCX Render` | Templates in `/data/templates`, Output in `/data/output` |
+| DOCX template fill | `scripts/docx-template-fill.py` | `/run` (`n8n_docx_template_fill`) | `docx-template-fill.fill_docx_template`, `py_docx_template_fill` | `Toolhub DOCX Template Fill` | Templates in `/templates`, Output in `/output` |
 
 ## Webhook Contracts
 
@@ -28,7 +31,28 @@ This document lists the currently available Toolhub features, where they can be 
 curl -sS http://localhost:5656/test
 ```
 
-### 2) Audio Split (`POST /audio-split`)
+### 2) n8n Audio Split (`POST /n8n_audio_split`)
+
+```bash
+curl -sS -X POST http://localhost:5656/n8n_audio_split \
+  -F "audio=@/tmp/e2e.m4a" \
+  -F "mode=silence" \
+  -F "chunk_length=600" \
+  -F "silence_seek=60" \
+  -F "silence_duration=0.5" \
+  -F "silence_threshold=-30" \
+  -F "padding=0.2" \
+  -F "enhance_speech=true"
+```
+
+### 3) Audio Chunk Download (`GET /audio-chunk/<job_id>/<filename>`)
+
+```bash
+curl -sS -o part_01.m4a \
+  "http://localhost:5656/audio-chunk/6f4d5d64-9a61-4ef4-9b7a-e2710f5adbe0/part_01.m4a"
+```
+
+### 4) Audio Split Compatibility (`POST /audio-split`)
 
 ```bash
 curl -sS -X POST http://localhost:5656/audio-split \
@@ -36,158 +60,36 @@ curl -sS -X POST http://localhost:5656/audio-split \
   -d '{
     "filename": "e2e.wav",
     "mode": "fixed",
-    "chunk_length": 1
-  }'
-```
-
-### 3) Generic Tool Run (`POST /run`)
-
-#### Cleanup (script tool)
-
-```bash
-curl -sS -X POST http://localhost:5656/run \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "tool": "cleanup",
-    "dry_run": true
-  }'
-```
-
-#### DOCX render (python registry tool)
-
-```bash
-curl -sS -X POST http://localhost:5656/run \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "tool": "docx-render",
-    "payload": {
-      "template": "e2e-render.docx",
-      "output_name": "rendered-now.docx",
-      "data": { "NAME": "Toolhub" }
-    }
-  }'
-```
-
-#### DOCX template fill (python registry tool)
-
-```bash
-curl -sS -X POST http://localhost:5656/run \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "tool": "docx-template-fill",
-    "payload": {
-      "template": "e2e-fill.docx",
-      "output_filename": "filled-now.docx",
-      "data": { "name": "Toolhub" }
-    }
-  }'
-```
-
-#### Wake-on-LAN (manifest or script alias)
-
-```bash
-curl -sS -X POST http://localhost:5656/run \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "tool": "wol-cli",
-    "args": ["00:11:22:33:44:55"]
-  }'
-```
-
-#### Transcript (backend required)
-
-```bash
-curl -sS -X POST http://localhost:5656/run \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "tool": "transcript",
-    "payload": { "input": "meeting.m4a", "format": "json", "backend": "auto" }
-  }'
-```
-
-## SSH Contracts
-
-```bash
-# Audio split
-/scripts/audio-split.sh --mode fixed --chunk-length 600 --input /shared/audio/in/input.m4a --output /shared/audio/out/job-1
-
-# DOCX render
-/scripts/docx-render.py --template e2e-render.docx --output-name out.docx --data '{"NAME":"Toolhub"}'
-
-# DOCX template fill
-/scripts/docx-template-fill.py --template e2e-fill.docx --output-filename out.docx --data '{"name":"Toolhub"}'
-
-# Wake-on-LAN
-/scripts/wol-cli.sh 00:11:22:33:44:55
-
-# Cleanup
-/scripts/cleanup.py --dry-run
-
-# Transcript
-/scripts/transcript.py --input meeting.m4a --format json --backend auto
-```
-
-## MCP Contracts
-
-The MCP server exposes script tools with normalized names (`sh_*`/`py_*`) and additional curated tools.
-
-### Common examples (tool name + input JSON)
-
-```json
-{
-  "tool": "sh_audio_split",
-  "input": {
-    "mode": "fixed",
     "chunk_length": 600,
-    "input": "/shared/audio/in/input.m4a",
-    "output": "/shared/audio/out/job-1"
-  }
-}
+    "enhance_speech": true
+  }'
 ```
 
-```json
-{
-  "tool": "py_cleanup",
-  "input": {
-    "dry_run": true
-  }
-}
-```
+### 5) Generic Tool Run (`POST /run` with n8n aliases)
 
-```json
-{
-  "tool": "docx-template-fill.fill_docx_template",
-  "input": {
-    "template": "e2e-fill.docx",
-    "output_filename": "filled-from-mcp.docx",
-    "data": {
-      "name": "Toolhub"
+```bash
+curl -sS -X POST http://localhost:5656/run \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "tool": "n8n_audio_cleanup",
+    "payload": {
+      "dry_run": true
     }
-  }
-}
+  }'
 ```
 
-```json
-{
-  "tool": "run_script",
-  "input": {
-    "name": "sh_wol_cli",
-    "args": ["00:11:22:33:44:55"]
-  }
-}
-```
+## n8n Community Package
+
+- Package: `n8n-nodes-toolhub`
+- Install in n8n via **Settings -> Community Nodes**
+- Credential: `Toolhub API` (`baseUrl` required, `apiKey` optional)
+- Guide: `docs/n8n_community_nodes_toolhub.md`
+- Package source: `integrations/n8n-nodes-toolhub`
 
 ## Optional/Conditional MCP CLI Tools
 
-The following are only registered when the binaries exist in the running image:
+Diese Tools sind nur registriert, wenn das jeweilige Binary im Image vorhanden ist:
 
 - `ffmpeg`, `sox`, `magick`, `tesseract`, `pdftotext`, `pdfinfo`, `jq`, `curl`, `exiftool`
-- `syft`, `grype`, `trivy`, `nuclei` (typically not installed in the base image)
-
-Additionally available when binaries are present:
-
-- `ffprobe_info`
-- `tesseract_ocr`
-- `pdftotext_extract`
-- `pdfinfo_read`
-- `nuclei_safe` (guardrailed nuclei execution)
+- `syft`, `grype`, `trivy`, `nuclei`
+- zusätzlich: `ffprobe_info`, `tesseract_ocr`, `pdftotext_extract`, `pdfinfo_read`, `nuclei_safe`

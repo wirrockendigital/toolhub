@@ -50,8 +50,8 @@ Toolhub can run in different modes depending on which services you enable.
 ```
 
 - **Base container** – Built from `Dockerfile`; entrypoint `start.sh` creates the `toolhubuser` user, prepares `/scripts`, `/shared`, `/logs`, starts SSH (`22`), cron, and Gunicorn for the webhook service (`5656`).
-- **Cron & scripts** – Host-mounted under `${TOOLHUB_BASEDIR}/toolhub/scripts` and `${TOOLHUB_BASEDIR}/toolhub/cron.d` (see `toolhub.yaml`). Logs go to `/logs` (`audio-split.log`, `webhook.log`).
-- **Webhook mode** – `scripts/webhook.py` offers `/`, `/test`, `/audio-split`, and `/run` endpoints to orchestrate automation from HTTP clients.
+- **Single-root persistence** – One host mount (`${TOOLHUB_PROJECT_DIR}:/workspace`) contains scripts, cron config, logs, shared audio, and data folders.
+- **Webhook mode** – `scripts/webhook.py` offers `/`, `/test`, `/n8n_audio_split`, `/audio-ingest-split`, `/audio-chunk/<job_id>/<filename>`, `/audio-split`, and `/run` endpoints to orchestrate automation from HTTP clients.
 - **MCP mode (optional)** – Add the `docker-compose.mcp.yml` sidecar to run `src/mcp/server.ts`, discover shell/Python scripts, and expose them as MCP tools over stdio.
 - **Source layout highlights**:
   - `scripts/` – Shell & Python helpers (`audio-split.sh`, `webhook.py`).
@@ -64,9 +64,8 @@ Toolhub can run in different modes depending on which services you enable.
 The fastest way to launch Toolhub (webhook + optional MCP) is via Docker Compose on a Docker-capable host (e.g. Synology NAS).
 
 ```bash
-# 1. Prepare host directories with matching permissions
-mkdir -p /volume2/docker/toolhub/{conf,cron.d,logs,scripts,data} \
-         /volume2/docker/shared/audio/{in,out}
+# 1. Prepare one host directory
+mkdir -p /volume2/docker/toolhub/{conf}
 
 # 2. Copy stack files from this repository
 cp toolhub.yaml toolhub.env /volume2/docker/toolhub/
@@ -109,11 +108,6 @@ docker run -d \
   --network allmydocker-net \
   --ip 192.168.123.5 \
   -v /volume2/docker/toolhub:/workspace \
-  -v /volume2/docker/shared:/shared \
-  -v /volume2/docker/toolhub/scripts:/scripts \
-  -v /volume2/docker/toolhub/cron.d:/etc/cron.d \
-  -v /volume2/docker/toolhub/logs:/logs \
-  -v /volume2/docker/toolhub/data:/data \
   toolhub:latest
 ```
 
@@ -164,7 +158,8 @@ services:
 
 | Variable | Default / Example | Description |
 | --- | --- | --- |
-| `TOOLHUB_BASEDIR` | `/volume2/docker` | Base host path used to build all bind mounts in `toolhub.yaml`. |
+| `TOOLHUB_PROJECT_DIR` | `/volume2/docker/toolhub` | Single host path mounted to `/workspace` for all persisted Toolhub data. |
+| `TOOLHUB_PROJECT_ROOT` | `/workspace` | Canonical runtime root used by `start.sh` inside the container. |
 | `TOOLHUB_DOCKER_NETWORK` | `allmydocker-net` | External Docker network name used by Toolhub. |
 | `TOOLHUB_IPV4_ADDRESS` | `192.168.123.5` | Fixed container IP on `TOOLHUB_DOCKER_NETWORK`. |
 | `TOOLHUB_SSH_PORT` | `2222` | Published SSH port for Toolhub. |
@@ -202,12 +197,23 @@ services:
 ## Feature Contract
 For the current, validated feature matrix and interface-specific invocation examples, see `docs/features.md`.
 
+For the end-to-end n8n ingestion/transcription/enrichment template (iOS webhook -> Toolhub split -> OpenAI -> Notion), see:
+
+- `docs/n8n_audio_pipeline.md`
+- `docs/workflows/n8n_ios_audio_toolhub_whisper_notion.json`
+- `docs/workflows/n8n_ios_audio_toolhub_whisper_notion_low_expression.json`
+
+For public Toolhub community nodes in n8n, see:
+
+- `docs/n8n_community_nodes_toolhub.md`
+- `integrations/n8n-nodes-toolhub`
+
 ### Bare-metal / local installs
 TODO: Document bare-metal installation beyond Docker.
 
 ### Configuration notes
-- `start.sh` ensures `/scripts`, `/etc/cron.d`, `/logs`, `/templates`, `/output`, `/data/{templates,output}`, and `/shared/audio/{in,out}` exist and are owned by `TOOLHUB_USER`.
-- Cron entries placed in `/etc/cron.d` run as `toolhubuser`; remember to add an empty newline at the end of each cron file.
+- `start.sh` ensures `/workspace/{scripts,cron.d,logs,shared,data}` exist and links legacy paths (`/scripts`, `/logs`, `/shared`, `/data`, `/templates`, `/output`) automatically.
+- Cron entries are managed in `/workspace/cron.d` and synced to `/etc/cron.d` during startup; keep a trailing newline in each cron file.
 - All agent logs must live under `/logs` (see `AGENTS.md`).
 
 ## Using Toolhub as an MCP Server
@@ -285,14 +291,23 @@ Scripts can embed an MCP metadata block to override descriptions or JSON schemas
   - `GET /` – Returns service metadata and available routes.
   - `GET /test` – Health probe returning `{"status": "ok"}`.
   - `POST /test` – Echoes JSON payloads for integration tests.
+  - `POST /n8n_audio_split` – Multipart endpoint for n8n-first upload + split with normalized chunk manifest.
+  - `POST /audio-ingest-split` – Multipart endpoint for direct upload + split with normalized chunk manifest (compatibility path).
+  - `GET /audio-chunk/<job_id>/<filename>` – Streams generated chunk binary from `/shared/audio/out/<job_id>`.
   - `POST /audio-split` – JSON body triggers `audio-split.sh` using files from `/shared/audio/in` and returns generated chunk metadata.
   - `POST /run` – Dispatches Python tools (`tools/__init__.py`), manifest CLI tools (`tools/*/tool.json`), and executable `/scripts` tools using either `payload` (named args), `args` (positional), or direct top-level fields for script flags.
-- **Inputs**: JSON payload with `filename`, `mode`, `chunk_length`, and optional silence/enhancement parameters for `/audio-split`; JSON payload with `tool` plus `payload`/`args` for `/run`.
-- **Outputs**: JSON containing `job_id`, `output_dir`, and chunk filenames for `/audio-split`; JSON tool results for `/run`. Errors include log excerpts when available. Logs stored in `/logs/webhook.log`.
+- **Inputs**: Multipart payload (`audio` + optional metadata) for `/n8n_audio_split` and `/audio-ingest-split`; JSON payload with `filename`, `mode`, `chunk_length`, and optional silence/enhancement parameters for `/audio-split`; JSON payload with `tool` plus `payload`/`args` for `/run`.
+- **Outputs**: Normalized manifest (`recordingId`, `jobId`, `ingest`, `meta`, `chunks[]`) for `/n8n_audio_split` and `/audio-ingest-split`; chunk binary for `/audio-chunk/...`; JSON containing `job_id`, `output_dir`, and chunk filenames for `/audio-split`; JSON tool results for `/run`. Logs stored in `/logs/webhook.log`.
 - **`/run` Dispatch Order**:
   1. Python tool registry (`tools/__init__.py`)
   2. Manifest tools (`tools/*/tool.json`)
   3. Executable scripts in `/scripts` (aliases like `py_transcript`, `sh_wol_cli`, `transcript`, `wol-cli.sh`)
+- **n8n alias names via `/run`**:
+  - `n8n_audio_cleanup` -> `cleanup`
+  - `n8n_audio_transcript_local` -> `transcript`
+  - `n8n_wol` -> `wol-cli`
+  - `n8n_docx_render` -> `docx-render`
+  - `n8n_docx_template_fill` -> `docx-template-fill`
 - **Python tools currently registered**: `docx-render`, `docx-template-fill`.
 
 ### `scripts/tests/mcp-smoke.sh`
@@ -359,7 +374,7 @@ Scripts can embed an MCP metadata block to override descriptions or JSON schemas
 ### Split audio locally via CLI
 ```bash
 # Place input file under /shared/audio/in on the host volume
-cp ~/Downloads/interview.m4a /volume2/docker/shared/audio/in/
+cp ~/Downloads/interview.m4a /volume2/docker/toolhub/shared/audio/in/
 
 # Run fixed-length splitting (30-second chunks)
 docker exec -it toolhub \
@@ -369,7 +384,44 @@ docker exec -it toolhub \
   --input interview.m4a
 ```
 
-### Trigger the audio split webhook
+### Trigger n8n-first upload + split
+```bash
+curl -X POST http://localhost:5656/n8n_audio_split \
+  -F "audio=@/volume2/docker/toolhub/shared/audio/in/interview.m4a" \
+  -F "mode=silence" \
+  -F "chunk_length=600" \
+  -F "silence_seek=60" \
+  -F "silence_duration=0.5" \
+  -F "silence_threshold=-30" \
+  -F "padding=0.2" \
+  -F "enhance_speech=true"
+```
+
+### Trigger upload + split (compat endpoint)
+```bash
+curl -X POST http://localhost:5656/audio-ingest-split \
+  -F "audio=@/volume2/docker/toolhub/shared/audio/in/interview.m4a" \
+  -F "title=Interview" \
+  -F "source=ios-shortcuts" \
+  -F "language=de" \
+  -F "mode=fixed" \
+  -F "chunk_length=600" \
+  -F "enhance_speech=true"
+```
+
+### Trigger `/run` with n8n alias naming
+```bash
+curl -X POST http://localhost:5656/run \
+  -H "Content-Type: application/json" \
+  -d '{
+        "tool": "n8n_audio_cleanup",
+        "payload": {
+          "dry_run": true
+        }
+      }'
+```
+
+### Trigger the compatibility split webhook
 ```bash
 curl -X POST http://localhost:5656/audio-split \
   -H "Content-Type: application/json" \
@@ -394,17 +446,16 @@ npm run mcp:dev -- --list-tools | jq '.[0:5]'
 ```
 
 ## Troubleshooting & FAQ
-- **Permission denied on mounted volumes** – Ensure `TOOLHUB_UID` and `TOOLHUB_GID` match the host user's UID/GID and that all `${TOOLHUB_BASEDIR}/toolhub/*` directories exist before deployment.
+- **Permission denied on mounted volumes** – Ensure `TOOLHUB_UID` and `TOOLHUB_GID` match the host user's UID/GID and that `${TOOLHUB_PROJECT_DIR}` is writable before deployment.
 - **Portainer shows only `unable to deploy stack` (no logs)** – First verify all bind-mount source directories exist on the host:
   ```bash
-  mkdir -p /volume2/docker/toolhub/{conf,cron.d,logs,scripts,data} \
-           /volume2/docker/shared/audio/{in,out}
+  mkdir -p /volume2/docker/toolhub/{conf,shared/audio/in,shared/audio/out,data/templates,data/output,scripts,cron.d,logs}
   ```
   Then redeploy the stack.
 - **Static IP deployment fails (`ipv4_address` set)** – If `TOOLHUB_IPV4_ADDRESS` is used, the external Docker network must have a user-defined subnet. Check `docker network inspect allmydocker-net` and confirm `IPAM.Config` contains a subnet (for example `192.168.123.0/24`).
 - **No audio chunks generated** – Check `/logs/audio-split.log`; the script aborts if the input file cannot be found or if `ffmpeg`/`ffprobe` are missing. The webhook also returns `log_tail` snippets when failures occur.
 - **MCP client cannot connect** – Verify the MCP sidecar is running, `SAFE_MODE` settings allow the requested paths/hosts, and the client connects over stdio (not HTTP).
-- **Cron job not firing** – Confirm cron files in `${TOOLHUB_BASEDIR}/toolhub/cron.d` end with a newline and use absolute paths or paths relative to `/shared`.
+- **Cron job not firing** – Confirm cron files in `${TOOLHUB_PROJECT_DIR}/cron.d` end with a newline and use absolute paths or paths relative to `/shared`.
 
 ## Development
 - Install Node dependencies for the MCP server: `npm install`.

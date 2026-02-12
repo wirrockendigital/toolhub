@@ -185,12 +185,17 @@ else
     BOUNDARY=$(echo "$CURRENT + $CHUNK_LENGTH" | bc)
     LOWER=$(echo "$BOUNDARY - $SILENCE_SEEK" | bc)
     SELECTED="$BOUNDARY"
+    # Select the nearest silence before the hard boundary inside the search window.
+    BEST_MATCH=""
     for T in "${SILENCE_TIMES[@]}"; do
       if (( $(echo "$T <= $BOUNDARY" | bc -l) )) && (( $(echo "$T >= $LOWER" | bc -l) )); then
-        SELECTED="$T"
-        break
+        # Keep updating so the last valid timestamp becomes the nearest before boundary.
+        BEST_MATCH="$T"
       fi
     done
+    if [[ -n "$BEST_MATCH" ]]; then
+      SELECTED="$BEST_MATCH"
+    fi
     CUT_POINT=$(echo "$SELECTED - $PADDING" | bc)
     if (( $(echo "$CUT_POINT < 0" | bc -l) )); then CUT_POINT=0; fi
     SPLIT_POINTS+=("$CUT_POINT")

@@ -1,0 +1,40 @@
+{
+  "name": "Toolhub Community Audio Cleanup Demo",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "46b2a281-5e42-4a42-a9fd-6f0d2bb3fb84",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-300, 220]
+    },
+    {
+      "parameters": {
+        "dryRun": true,
+        "tmpMaxAgeHours": 24
+      },
+      "id": "730b5878-8f29-4496-b80e-61f2fe47bd6a",
+      "name": "Toolhub Audio Cleanup",
+      "type": "n8n-nodes-toolhub.toolhubAudioCleanup",
+      "typeVersion": 1,
+      "position": [-60, 220]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Toolhub Audio Cleanup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

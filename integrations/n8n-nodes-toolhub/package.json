@@ -1,0 +1,50 @@
+{
+  "name": "n8n-nodes-toolhub",
+  "version": "0.1.0",
+  "description": "Toolhub community nodes for n8n with audio-first namespace integration.",
+  "license": "MIT",
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "n8n-community-node-package",
+    "n8n",
+    "toolhub",
+    "audio"
+  ],
+  "author": "Toolhub",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/toolhub/toolhub.git",
+    "directory": "integrations/n8n-nodes-toolhub"
+  },
+  "homepage": "https://github.com/toolhub/toolhub",
+  "peerDependencies": {
+    "n8n-workflow": ">=1.70.0"
+  },
+  "devDependencies": {
+    "n8n-workflow": "^1.82.0",
+    "typescript": "^5.6.3"
+  },
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [
+      "dist/credentials/ToolhubApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/ToolhubAudioSplit/ToolhubAudioSplit.node.js",
+      "dist/nodes/ToolhubAudioSplitCompat/ToolhubAudioSplitCompat.node.js",
+      "dist/nodes/ToolhubAudioTranscriptLocal/ToolhubAudioTranscriptLocal.node.js",
+      "dist/nodes/ToolhubAudioCleanup/ToolhubAudioCleanup.node.js",
+      "dist/nodes/ToolhubWol/ToolhubWol.node.js",
+      "dist/nodes/ToolhubDocxRender/ToolhubDocxRender.node.js",
+      "dist/nodes/ToolhubDocxTemplateFill/ToolhubDocxTemplateFill.node.js"
+    ]
+  }
+}
