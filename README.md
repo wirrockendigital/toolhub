@@ -456,6 +456,16 @@ npm run mcp:dev -- --list-tools | jq '.[0:5]'
 - **No audio chunks generated** – Check `/logs/audio-split.log`; the script aborts if the input file cannot be found or if `ffmpeg`/`ffprobe` are missing. The webhook also returns `log_tail` snippets when failures occur.
 - **MCP client cannot connect** – Verify the MCP sidecar is running, `SAFE_MODE` settings allow the requested paths/hosts, and the client connects over stdio (not HTTP).
 - **Cron job not firing** – Confirm cron files in `${TOOLHUB_PROJECT_DIR}/cron.d` end with a newline and use absolute paths or paths relative to `/shared`.
+- **GitHub Package API returns `401`/`404` for Toolhub** – Use the user namespace endpoint (not org namespace) and ensure package scopes exist on your `gh` token:
+  ```bash
+  gh auth status
+  gh api /users/wirrockendigital/packages/container/toolhub --jq '{name, visibility, package_type, html_url}'
+  ```
+  If scopes are missing, re-login with package scopes:
+  ```bash
+  gh auth logout -h github.com -u wirrockendigital
+  gh auth login -h github.com --git-protocol https --web --scopes 'repo,read:org,gist,read:packages,write:packages'
+  ```
 
 ## Development
 - Install Node dependencies for the MCP server: `npm install`.
