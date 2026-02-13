@@ -60,15 +60,21 @@ export async function requestToolhubJson(
 	},
 ): Promise<IDataObject> {
 	// JSON requests are used by split manifests and /run tool invocations.
-	const response = await context.helpers.httpRequest({
+	const requestOptions: IDataObject = {
 		url: options.url,
 		method: options.method,
 		headers: options.headers,
 		body: options.body,
-		formData: options.formData,
 		json: true,
 		timeout: options.timeout ?? 600000,
-	});
+	};
+
+	// FormData is set dynamically because helper typings differ between n8n versions.
+	if (options.formData) {
+		requestOptions.formData = options.formData;
+	}
+
+	const response = await context.helpers.httpRequest(requestOptions as any);
 
 	if (!response || typeof response !== 'object') {
 		throw new NodeOperationError(context.getNode(), 'Toolhub returned an unexpected non-JSON response');
@@ -91,16 +97,21 @@ export async function requestToolhubBuffer(
 		method: 'GET',
 		headers: options.headers,
 		json: false,
-		encoding: null,
+		responseType: 'arraybuffer',
 		timeout: options.timeout ?? 600000,
-	});
+	} as any);
 
 	if (Buffer.isBuffer(response)) {
 		return response;
 	}
 
-	if (response instanceof ArrayBuffer) {
+	// Uint8Array handling keeps compatibility with helper return types across n8n versions.
+	if (response instanceof Uint8Array) {
 		return Buffer.from(response);
+	}
+
+	if (response instanceof ArrayBuffer) {
+		return Buffer.from(new Uint8Array(response));
 	}
 
 	if (typeof response === 'string') {

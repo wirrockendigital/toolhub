@@ -1,0 +1,547 @@
+{
+  "name": "iOS Audio -> Toolhub Community Audio Split -> OpenAI -> Notion",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ios-audio-ingest-community",
+        "responseMode": "responseNode",
+        "options": {
+          "binaryData": true
+        }
+      },
+      "id": "5b8493f1-7c1c-4f54-9f36-213dc63a2a71",
+      "name": "Ingress Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1500,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "binaryPropertyName": "audio",
+        "outputBinaryPropertyName": "audioChunk",
+        "splitMode": "hard",
+        "chunkLengthSeconds": 600,
+        "enhanceSpeech": true,
+        "recordingId": "={{$json.recordingId || ''}}",
+        "title": "={{$json.title || ''}}",
+        "source": "={{$json.source || 'ios-webhook'}}",
+        "language": "={{$json.language || 'de'}}",
+        "capturedAt": "={{$json.capturedAt || ''}}"
+      },
+      "id": "df2f7f15-57a9-4bf1-b794-e810dad26d6c",
+      "name": "Toolhub Audio Split",
+      "type": "n8n-nodes-toolhub.toolhubAudioSplit",
+      "typeVersion": 1,
+      "position": [
+        -1260,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "binaryPropertyName": "audioChunk",
+        "options": {
+          "language": "={{$json.language || 'de'}}"
+        }
+      },
+      "id": "1d4ec5d7-0d2a-449d-9ec7-2cb789b5ca0f",
+      "name": "OpenAI Transcribe Chunk",
+      "type": "n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        -300,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "0de7f4b7-c2b5-43d9-a182-bef9f4c3f126",
+      "name": "Merge Transcript Context",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -60,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ ({ recordingId: $json.Input1?.recordingId || '', title: $json.Input1?.title || '', source: $json.Input1?.source || 'ios-webhook', language: $json.Input1?.language || 'de', capturedAt: $json.Input1?.capturedAt || '', toolhubJobId: $json.Input1?.toolhubJobId || $json.Input1?.jobId || '', chunkIndex: Number($json.Input1?.chunkIndex || 0), transcriptPart: String($json.Input2?.text ?? $json.Input2?.transcript ?? $json.Input2?.output_text ?? '').trim() }) }}",
+        "options": {}
+      },
+      "id": "37fc6433-cfd2-4f8b-a98b-2ebf9c879cc4",
+      "name": "Set Transcript Row",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        180,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "sortFieldsUi": {
+          "sortField": [
+            {
+              "fieldName": "chunkIndex",
+              "order": "ascending"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f8d4477e-c4e0-45e3-8abe-ed33cde2ef11",
+      "name": "Sort Chunks",
+      "type": "n8n-nodes-base.sort",
+      "typeVersion": 1,
+      "position": [
+        420,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "chunkRows",
+        "include": "allFields",
+        "options": {}
+      },
+      "id": "6a083032-2380-40fb-a9e9-04eb29742f7c",
+      "name": "Aggregate Chunk Rows",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        660,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ ({ recordingId: $json.chunkRows?.[0]?.recordingId || '', title: $json.chunkRows?.[0]?.title || '', source: $json.chunkRows?.[0]?.source || 'ios-webhook', language: $json.chunkRows?.[0]?.language || 'de', capturedAt: $json.chunkRows?.[0]?.capturedAt || '', toolhubJobId: $json.chunkRows?.[0]?.toolhubJobId || '', chunkCount: Number($json.chunkRows?.length || 0), durationClass: ($json.chunkRows?.length || 0) > 1 ? 'multi' : 'single', transcript: ($json.chunkRows || []).map((row) => String(row.transcriptPart || '').trim()).filter(Boolean).join('\\n\\n'), fullTranscript: ($json.chunkRows || []).map((row) => String(row.transcriptPart || '').trim()).filter(Boolean).join('\\n\\n') }) }}",
+        "options": {}
+      },
+      "id": "25854313-8cca-4261-bfc2-c1750919f740",
+      "name": "Set Transcript Context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        900,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "text",
+        "operation": "response",
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-5.2"
+        },
+        "responses": {
+          "values": [
+            {
+              "type": "text",
+              "role": "user",
+              "content": "={{$json.transcript}}"
+            }
+          ]
+        },
+        "simplify": false,
+        "options": {
+          "promptConfig": {
+            "promptOptions": {
+              "promptId": "pmpt_698c7fb03f9881969e81d41faa8b70780705e6b67ad926b7"
+            }
+          },
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          }
+        }
+      },
+      "id": "87cb1adb-72ef-4af7-9878-11fb83538615",
+      "name": "OpenAI Enrichment",
+      "type": "n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        1140,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "cda6bf34-f20d-467e-91d8-af9fab7f8e62",
+      "name": "Merge Enrichment Context",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1380,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ ({ recordingId: $json.Input1?.recordingId || '', title: $json.Input1?.title || '', source: $json.Input1?.source || 'ios-webhook', language: $json.Input1?.language || 'de', capturedAt: $json.Input1?.capturedAt || '', toolhubJobId: $json.Input1?.toolhubJobId || '', chunkCount: Number($json.Input1?.chunkCount || 0), durationClass: $json.Input1?.durationClass || 'single', transcript: $json.Input1?.transcript || '', fullTranscript: $json.Input1?.fullTranscript || '', rawEnrichment: $json.Input2?.output_text ?? $json.Input2?.output?.[0]?.content?.[0]?.text ?? '{}' }) }}",
+        "options": {}
+      },
+      "id": "a2df7dc3-8a17-4834-afcf-b2158ead6f48",
+      "name": "Set Enrichment Raw",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1620,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ ({ recordingId: $json.recordingId, title: $json.title, source: $json.source, language: $json.language, capturedAt: $json.capturedAt, toolhubJobId: $json.toolhubJobId, chunkCount: $json.chunkCount, durationClass: $json.durationClass, transcript: $json.transcript, fullTranscript: $json.fullTranscript, parsedEnrichment: (typeof $json.rawEnrichment === 'string' ? JSON.parse($json.rawEnrichment) : ($json.rawEnrichment || {})) }) }}",
+        "options": {}
+      },
+      "id": "239f8d6d-3225-435b-b3dc-a4fe353afdb5",
+      "name": "Parse Enrichment JSON",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1860,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ ({ recordingId: $json.recordingId, title: $json.title, source: $json.source, language: $json.language, capturedAt: $json.capturedAt, toolhubJobId: $json.toolhubJobId, chunkCount: Number($json.chunkCount || 0), durationClass: $json.durationClass || 'single', transcript: $json.transcript || '', fullTranscript: $json.fullTranscript || '', enrichmentTitle: String($json.parsedEnrichment?.title || $json.title || $json.recordingId || 'Audio Note'), enrichmentSummary: String($json.parsedEnrichment?.summary || ''), enrichmentKeyPoints: Array.isArray($json.parsedEnrichment?.key_points) ? $json.parsedEnrichment.key_points : [], enrichmentFollowUps: Array.isArray($json.parsedEnrichment?.follow_ups) ? $json.parsedEnrichment.follow_ups : [], enrichmentActionItems: Array.isArray($json.parsedEnrichment?.action_items) ? $json.parsedEnrichment.action_items : [], enrichmentTags: Array.isArray($json.parsedEnrichment?.tags) ? $json.parsedEnrichment.tags : [], enrichmentRiskFlags: Array.isArray($json.parsedEnrichment?.risk_flags) ? $json.parsedEnrichment.risk_flags : [] }) }}",
+        "options": {}
+      },
+      "id": "5f8ccde8-c4a8-493f-b420-5f5ea17ee66e",
+      "name": "Set Enrichment Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2100,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{$env.NOTION_DATABASE_ID}}"
+        },
+        "title": "={{$json.enrichmentTitle || $json.title || $json.recordingId}}",
+        "simple": false,
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "RecordingId|rich_text",
+              "richText": false,
+              "textContent": "={{$json.recordingId}}"
+            },
+            {
+              "key": "Source|rich_text",
+              "richText": false,
+              "textContent": "={{$json.source || ''}}"
+            },
+            {
+              "key": "CapturedAt|rich_text",
+              "richText": false,
+              "textContent": "={{$json.capturedAt || ''}}"
+            },
+            {
+              "key": "Language|rich_text",
+              "richText": false,
+              "textContent": "={{$json.language || ''}}"
+            },
+            {
+              "key": "DurationClass|rich_text",
+              "richText": false,
+              "textContent": "={{$json.durationClass || ''}}"
+            },
+            {
+              "key": "ChunkCount|number",
+              "numberValue": "={{Number($json.chunkCount || 0)}}"
+            },
+            {
+              "key": "ToolhubJobId|rich_text",
+              "richText": false,
+              "textContent": "={{$json.toolhubJobId || ''}}"
+            },
+            {
+              "key": "Summary|rich_text",
+              "richText": false,
+              "textContent": "={{$json.enrichmentSummary || ''}}"
+            },
+            {
+              "key": "FullTranscript|rich_text",
+              "richText": false,
+              "textContent": "={{($json.fullTranscript || '').slice(0, 1900)}}"
+            },
+            {
+              "key": "FollowUps|rich_text",
+              "richText": false,
+              "textContent": "={{Array.isArray($json.enrichmentFollowUps) ? $json.enrichmentFollowUps.join('\\n') : ''}}"
+            },
+            {
+              "key": "ActionItems|rich_text",
+              "richText": false,
+              "textContent": "={{Array.isArray($json.enrichmentActionItems) ? $json.enrichmentActionItems.join('\\n') : ''}}"
+            },
+            {
+              "key": "KeyPoints|rich_text",
+              "richText": false,
+              "textContent": "={{Array.isArray($json.enrichmentKeyPoints) ? $json.enrichmentKeyPoints.join('\\n') : ''}}"
+            },
+            {
+              "key": "Tags|rich_text",
+              "richText": false,
+              "textContent": "={{Array.isArray($json.enrichmentTags) ? $json.enrichmentTags.join('\\n') : ''}}"
+            },
+            {
+              "key": "RiskFlags|rich_text",
+              "richText": false,
+              "textContent": "={{Array.isArray($json.enrichmentRiskFlags) ? $json.enrichmentRiskFlags.join('\\n') : ''}}"
+            }
+          ]
+        }
+      },
+      "id": "2f44ae1a-3443-49cc-b1fd-28355ced4b9f",
+      "name": "Notion Create Page",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        2340,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { recordingId: $('Set Enrichment Fields').first().json.recordingId, status: 'ok', notionPageId: $json.id ?? null } }}",
+        "options": {}
+      },
+      "id": "42f8fcb5-5418-467c-b52e-d88a5c511fc9",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [
+        2580,
+        180
+      ]
+    }
+  ],
+  "connections": {
+    "OpenAI Transcribe Chunk": {
+      "main": [
+        [
+          {
+            "node": "Merge Transcript Context",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Transcript Context": {
+      "main": [
+        [
+          {
+            "node": "Set Transcript Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Transcript Row": {
+      "main": [
+        [
+          {
+            "node": "Sort Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sort Chunks": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Chunk Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Chunk Rows": {
+      "main": [
+        [
+          {
+            "node": "Set Transcript Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Transcript Context": {
+      "main": [
+        [
+          {
+            "node": "Merge Enrichment Context",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "OpenAI Enrichment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Enrichment": {
+      "main": [
+        [
+          {
+            "node": "Merge Enrichment Context",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Enrichment Context": {
+      "main": [
+        [
+          {
+            "node": "Set Enrichment Raw",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Enrichment Raw": {
+      "main": [
+        [
+          {
+            "node": "Parse Enrichment JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Enrichment JSON": {
+      "main": [
+        [
+          {
+            "node": "Set Enrichment Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Enrichment Fields": {
+      "main": [
+        [
+          {
+            "node": "Notion Create Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion Create Page": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ingress Webhook": {
+      "main": [
+        [
+          {
+            "node": "Toolhub Audio Split",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Toolhub Audio Split": {
+      "main": [
+        [
+          {
+            "node": "Merge Transcript Context",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "OpenAI Transcribe Chunk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  },
+  "active": false,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "pinData": {},
+  "tags": [
+    {
+      "name": "n8n"
+    },
+    {
+      "name": "toolhub"
+    },
+    {
+      "name": "community-node"
+    },
+    {
+      "name": "notion"
+    }
+  ]
+}
