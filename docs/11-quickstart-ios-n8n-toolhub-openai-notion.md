@@ -157,6 +157,6 @@ curl -sS http://toolhub:5656/test
 
 ## 7) Referenzen
 
-- `doccs/02-audio-split-upload-first.md`
-- `doccs/09-run-dispatcher.md`
+- `docs/02-audio-split-upload-first.md`
+- `docs/09-run-dispatcher.md`
 - `docs/n8n_audio_pipeline.md`
