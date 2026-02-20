@@ -1,3 +1,11 @@
+## [0.2.8] – 2026-02-20
+### Fixed
+- MCP schema conversion now supports JSON-schema `pattern` fields in `JsonSchema` and compiles regex constraints into zod validation.
+- TypeScript MCP build error resolved by extending the internal schema type to include `pattern`.
+
+### Changed
+- Project version metadata bumped to `0.2.8` across VERSION/package/pyproject/MCP defaults.
+
 ## [0.2.7] – 2026-02-20
 ### Fixed
 - MCP build dependency updated from unavailable `@modelcontextprotocol/sdk@^0.2.0` to available `@modelcontextprotocol/sdk@^0.7.0` for GitHub CI compatibility.

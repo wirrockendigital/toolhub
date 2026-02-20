@@ -7,6 +7,7 @@ export interface JsonSchema {
   required?: string[];
   description?: string;
   enum?: string[];
+  pattern?: string;
   additionalProperties?: boolean | JsonSchema;
 }
 
@@ -64,6 +65,14 @@ export function jsonSchemaToZod(schema: JsonSchema): z.ZodTypeAny {
           return z.string();
         }
         return z.enum([first, ...rest] as [string, ...string[]]);
+      }
+      if (schema.pattern) {
+        try {
+          // Keep JSON-schema string pattern constraints when converting to zod.
+          return z.string().regex(new RegExp(schema.pattern));
+        } catch {
+          return z.string();
+        }
       }
       return z.string();
     }

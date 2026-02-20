@@ -70,3 +70,5 @@
 65. Versionsanhebung auf `0.2.6` für den CI-Fix-Release durchgeführt (`VERSION`, `pyproject.toml`, `package.json`, `src/mcp/config.ts`, `integrations/n8n-nodes-toolhub/package.json`, `CHANGELOG.md`).
 66. MCP-Dependency-Fix nach CI-Fehler umgesetzt: `@modelcontextprotocol/sdk` in `package.json` von nicht mehr verfügbarem `^0.2.0` auf `^0.7.0` angehoben, damit `npm install` im GitHub-Runner wieder erfolgreich auflöst.
 67. Versionsanhebung auf `0.2.7` für den MCP-CI-Fix durchgeführt und in `CHANGELOG.md` als separates Release dokumentiert.
+68. MCP-Typesystem für JSON-Schema erweitert: `JsonSchema` unterstützt jetzt explizit `pattern`, und `jsonSchemaToZod` übernimmt Pattern-Regeln als Regex-Validierung für String-Felder.
+69. Versionsanhebung auf `0.2.8` als CI-Stabilisierungs-Release für den TypeScript-MCP-Build-Fix durchgeführt und im Changelog dokumentiert.
