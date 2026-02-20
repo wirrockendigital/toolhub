@@ -39,7 +39,7 @@ const DEFAULTS = {
   RATE_LIMIT_WINDOW_MS: 10_000,
   SCRIPTS_ROOT: "/app/scripts",
   SERVER_NAME: "toolhub-mcp",
-  SERVER_VERSION: "0.2.5",
+  SERVER_VERSION: "0.2.6",
 };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): McpConfig {

@@ -1,3 +1,11 @@
+## [0.2.6] – 2026-02-20
+### Fixed
+- Toolhub CI Node setup no longer requires a root npm lockfile by removing npm cache binding from `actions/setup-node`.
+- DOCX template-fill unit test now expects `TemplateValidationError` for missing templates, matching runtime behavior.
+
+### Changed
+- Project version metadata bumped to `0.2.6` across VERSION/package/pyproject/MCP defaults.
+
 ## [0.2.5] – 2026-02-20
 ### Added
 - New webhook endpoints `GET /tools`, `POST /run-file`, and `GET /artifacts/<job_id>/<filename>` for unified tool discovery and file-first execution.

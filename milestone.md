@@ -65,3 +65,6 @@
 60. Versionsanhebung auf `0.2.0` durchgeführt (`VERSION`, `pyproject.toml`, `package.json`, `src/mcp/config.ts`, `integrations/n8n-nodes-toolhub/package.json`) und `CHANGELOG.md` mit Release-Eintrag aktualisiert.
 61. Dokumentation aktualisiert: `docs/features.md`, `docs/n8n_community_nodes_toolhub.md`, `integrations/n8n-nodes-toolhub/README.md` und zentrale Webhook-Abschnitte in `README.md` auf neue Tool-/Endpoint-Struktur synchronisiert.
 62. Testbasis erweitert: neuer Unit-Test `tests/tool_scripts/test_array_stats.py` ergänzt und CI-Pipeline (`.github/workflows/ci.yml`) auf Syntaxcheck für alle Skripte plus zusätzliche Testausführung angepasst.
+63. Release-Commit `v0.2.5` erstellt und auf `main` + Tag gepusht, um den Wave-1-3-Ausbau erstmals als tag-basiertes Release zu veröffentlichen.
+64. CI-Blocker nach erstem Push behoben: Node-Setup in `.github/workflows/ci.yml` ohne npm-Cache-Lockfile-Zwang konfiguriert und DOCX-Test `test_missing_template_raises` auf `TemplateValidationError` angepasst.
+65. Versionsanhebung auf `0.2.6` für den CI-Fix-Release durchgeführt (`VERSION`, `pyproject.toml`, `package.json`, `src/mcp/config.ts`, `integrations/n8n-nodes-toolhub/package.json`, `CHANGELOG.md`).

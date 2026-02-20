@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-toolhub",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Toolhub community nodes for n8n with audio-first namespace integration.",
   "license": "MIT",
   "type": "commonjs",

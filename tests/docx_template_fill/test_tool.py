@@ -65,7 +65,7 @@ class DocxTemplateFillTests(unittest.TestCase):
             "data": {"NAME": "Bob"},
             "output_filename": "out.docx",
         }
-        with self.assertRaises(FileNotFoundError):
+        with self.assertRaises(self.renderer.TemplateValidationError):
             self.tool.fill_docx_template(payload)
 
     def test_invalid_template_extension(self) -> None:
