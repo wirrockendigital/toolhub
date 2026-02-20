@@ -1,3 +1,11 @@
+## [0.2.9] – 2026-02-20
+### Fixed
+- MCP server transport import switched to `@modelcontextprotocol/sdk/server/stdio.js`, matching current SDK module layout during `--list-tools` startup.
+- MCP SDK type declaration updated to the new stdio transport module path.
+
+### Changed
+- Project version metadata bumped to `0.2.9` across VERSION/package/pyproject/MCP defaults.
+
 ## [0.2.8] – 2026-02-20
 ### Fixed
 - MCP schema conversion now supports JSON-schema `pattern` fields in `JsonSchema` and compiles regex constraints into zod validation.

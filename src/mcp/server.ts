@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import process from "node:process";
 import { Server } from "@modelcontextprotocol/sdk/server";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/transports/stdio";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { loadConfig } from "./config.js";
 import { createToolRegistry } from "./tool-registry.js";
 

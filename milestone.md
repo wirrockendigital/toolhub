@@ -72,3 +72,6 @@
 67. Versionsanhebung auf `0.2.7` für den MCP-CI-Fix durchgeführt und in `CHANGELOG.md` als separates Release dokumentiert.
 68. MCP-Typesystem für JSON-Schema erweitert: `JsonSchema` unterstützt jetzt explizit `pattern`, und `jsonSchemaToZod` übernimmt Pattern-Regeln als Regex-Validierung für String-Felder.
 69. Versionsanhebung auf `0.2.8` als CI-Stabilisierungs-Release für den TypeScript-MCP-Build-Fix durchgeführt und im Changelog dokumentiert.
+70. MCP-Server auf aktuelles SDK-Modulrouting angepasst: `StdioServerTransport` wird nun über `@modelcontextprotocol/sdk/server/stdio.js` importiert, damit `npm run mcp:dev -- --list-tools` im CI-Runtime-Check startet.
+71. Typescript-Moduldeklamation für MCP-stdio entsprechend auf `@modelcontextprotocol/sdk/server/stdio.js` synchronisiert.
+72. Versionsanhebung auf `0.2.9` für den Discovery-Runtime-Fix durchgeführt und im Changelog dokumentiert.

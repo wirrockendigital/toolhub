@@ -17,6 +17,6 @@ declare module "@modelcontextprotocol/sdk/server" {
   }
 }
 
-declare module "@modelcontextprotocol/sdk/transports/stdio" {
+declare module "@modelcontextprotocol/sdk/server/stdio.js" {
   export class StdioServerTransport {}
 }
