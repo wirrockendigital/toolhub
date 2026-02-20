@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "toolhub"
-version = "0.2.6"
+version = "0.2.7"
 description = "Toolhub automation utilities"
 requires-python = ">=3.11"
 dependencies = [

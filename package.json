@@ -1,6 +1,6 @@
 {
   "name": "toolhub-mcp",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,7 +9,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^0.2.0",
+    "@modelcontextprotocol/sdk": "^0.7.0",
     "execa": "^8.0.1",
     "fast-glob": "^3.3.2",
     "zod": "^3.22.4"

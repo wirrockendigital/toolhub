@@ -68,3 +68,5 @@
 63. Release-Commit `v0.2.5` erstellt und auf `main` + Tag gepusht, um den Wave-1-3-Ausbau erstmals als tag-basiertes Release zu veröffentlichen.
 64. CI-Blocker nach erstem Push behoben: Node-Setup in `.github/workflows/ci.yml` ohne npm-Cache-Lockfile-Zwang konfiguriert und DOCX-Test `test_missing_template_raises` auf `TemplateValidationError` angepasst.
 65. Versionsanhebung auf `0.2.6` für den CI-Fix-Release durchgeführt (`VERSION`, `pyproject.toml`, `package.json`, `src/mcp/config.ts`, `integrations/n8n-nodes-toolhub/package.json`, `CHANGELOG.md`).
+66. MCP-Dependency-Fix nach CI-Fehler umgesetzt: `@modelcontextprotocol/sdk` in `package.json` von nicht mehr verfügbarem `^0.2.0` auf `^0.7.0` angehoben, damit `npm install` im GitHub-Runner wieder erfolgreich auflöst.
+67. Versionsanhebung auf `0.2.7` für den MCP-CI-Fix durchgeführt und in `CHANGELOG.md` als separates Release dokumentiert.

@@ -1,3 +1,10 @@
+## [0.2.7] – 2026-02-20
+### Fixed
+- MCP build dependency updated from unavailable `@modelcontextprotocol/sdk@^0.2.0` to available `@modelcontextprotocol/sdk@^0.7.0` for GitHub CI compatibility.
+
+### Changed
+- Project version metadata bumped to `0.2.7` across VERSION/package/pyproject/MCP defaults.
+
 ## [0.2.6] – 2026-02-20
 ### Fixed
 - Toolhub CI Node setup no longer requires a root npm lockfile by removing npm cache binding from `actions/setup-node`.
