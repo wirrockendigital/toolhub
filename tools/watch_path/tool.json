@@ -1,0 +1,16 @@
+{
+  "name": "watch_path",
+  "description": "Watch filesystem paths for changes.",
+  "command": "/scripts/watch-path.py",
+  "io_mode": "json",
+  "n8n_alias": "n8n_watch_path",
+  "output_artifacts": true,
+  "args": [
+    {"name": "watch_path", "type": "string", "required": false, "style": "flag"},
+    {"name": "timeout_seconds", "type": "string", "required": false, "style": "flag"},
+    {"name": "max_events", "type": "string", "required": false, "style": "flag"},
+    {"name": "recursive", "type": "string", "required": false, "style": "flag"},
+    {"name": "output_dir", "type": "string", "required": false, "style": "flag"},
+    {"name": "output_filename", "type": "string", "required": false, "style": "flag"}
+  ]
+}

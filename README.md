@@ -170,6 +170,7 @@ services:
 | `TOOLHUB_GID` | `100` | GID mapped to host group; must match host permissions. |
 | `TOOLHUB_MANIFEST_TOOLS_DIR` | `/opt/toolhub/tools` | Directory that contains `tool.json` manifests for webhook `/run` CLI dispatch. |
 | `TOOLHUB_SCRIPT_TOOLS_DIR` | `/scripts` | Directory scanned by webhook `/run` for executable script tools. |
+| `TOOLHUB_ARTIFACTS_DIR` | `/shared/artifacts` | Artifact root for webhook `/run-file` and `/artifacts/<job_id>/<filename>`. |
 | `TOOLHUB_PYTHON_ROOT` | `/opt/toolhub` | Python import root used by webhook `/run` and script wrappers for local tool modules. |
 | `DOCX_TEMPLATE_ROOT` | `/templates` | Template root used by `docx-template-fill`. |
 | `DOCX_OUTPUT_ROOT` | `/output` | Output root used by `docx-template-fill`. |
@@ -291,23 +292,27 @@ Scripts can embed an MCP metadata block to override descriptions or JSON schemas
   - `GET /` – Returns service metadata and available routes.
   - `GET /test` – Health probe returning `{"status": "ok"}`.
   - `POST /test` – Echoes JSON payloads for integration tests.
+  - `GET /tools` – Lists discovered Python/manifest/script tools and aliases.
   - `POST /n8n_audio_split` – Multipart endpoint for n8n-first upload + split with normalized chunk manifest.
   - `POST /audio-ingest-split` – Multipart endpoint for direct upload + split with normalized chunk manifest (compatibility path).
   - `GET /audio-chunk/<job_id>/<filename>` – Streams generated chunk binary from `/shared/audio/out/<job_id>`.
   - `POST /audio-split` – JSON body triggers `audio-split.sh` using files from `/shared/audio/in` and returns generated chunk metadata.
-  - `POST /run` – Dispatches Python tools (`tools/__init__.py`), manifest CLI tools (`tools/*/tool.json`), and executable `/scripts` tools using either `payload` (named args), `args` (positional), or direct top-level fields for script flags.
-- **Inputs**: Multipart payload (`audio` + optional metadata) for `/n8n_audio_split` and `/audio-ingest-split`; JSON payload with `filename`, `mode`, `chunk_length`, and optional silence/enhancement parameters for `/audio-split`; JSON payload with `tool` plus `payload`/`args` for `/run`.
-- **Outputs**: Normalized manifest (`recordingId`, `jobId`, `ingest`, `meta`, `chunks[]`) for `/n8n_audio_split` and `/audio-ingest-split`; chunk binary for `/audio-chunk/...`; JSON containing `job_id`, `output_dir`, and chunk filenames for `/audio-split`; JSON tool results for `/run`. Logs stored in `/logs/webhook.log`.
+  - `POST /run` – Dispatches JSON-first tools.
+  - `POST /run-file` – Dispatches file-first tools with artifact tracking (`tool`, `file`, optional JSON `payload`).
+  - `GET /artifacts/<job_id>/<filename>` – Downloads generated artifact files from `/shared/artifacts/<job_id>`.
+- **Inputs**: Multipart payload (`audio` + optional metadata) for `/n8n_audio_split` and `/audio-ingest-split`; JSON payload with `filename`, `mode`, `chunk_length`, and optional silence/enhancement parameters for `/audio-split`; JSON payload with `tool` plus `payload`/`args` for `/run`; multipart payload (`tool`, `file`, optional `payload`) for `/run-file`.
+- **Outputs**: Normalized manifest (`recordingId`, `jobId`, `ingest`, `meta`, `chunks[]`) for `/n8n_audio_split` and `/audio-ingest-split`; chunk binary for `/audio-chunk/...`; JSON containing `job_id`, `output_dir`, and chunk filenames for `/audio-split`; JSON tool results for `/run`; JSON result + artifact index for `/run-file`. Logs stored in `/logs/webhook.log`.
 - **`/run` Dispatch Order**:
   1. Python tool registry (`tools/__init__.py`)
   2. Manifest tools (`tools/*/tool.json`)
-  3. Executable scripts in `/scripts` (aliases like `py_transcript`, `sh_wol_cli`, `transcript`, `wol-cli.sh`)
+  3. Scripts in `/scripts` (aliases like `py_transcript`, `sh_wol_cli`, `transcript`, `wol-cli.sh`)
 - **n8n alias names via `/run`**:
   - `n8n_audio_cleanup` -> `cleanup`
   - `n8n_audio_transcript_local` -> `transcript`
   - `n8n_wol` -> `wol-cli`
   - `n8n_docx_render` -> `docx-render`
   - `n8n_docx_template_fill` -> `docx-template-fill`
+- **Manifest aliases**: Additional aliases are loaded from each `tools/*/tool.json` (`n8n_alias`), and the default alias pattern is `n8n_<tool_name>`.
 - **Python tools currently registered**: `docx-render`, `docx-template-fill`.
 
 ### `scripts/tests/mcp-smoke.sh`
@@ -419,6 +424,14 @@ curl -X POST http://localhost:5656/run \
           "dry_run": true
         }
       }'
+```
+
+### Trigger `/run-file` for file-first tools
+```bash
+curl -X POST http://localhost:5656/run-file \
+  -F "tool=n8n_pdf_extract_text" \
+  -F "file=@/volume2/docker/toolhub/shared/invoice.pdf" \
+  -F 'payload={"output_filename":"invoice.txt"}'
 ```
 
 ### Trigger the compatibility split webhook

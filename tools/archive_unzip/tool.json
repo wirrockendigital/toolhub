@@ -1,0 +1,12 @@
+{
+  "name": "archive_unzip",
+  "description": "Extract ZIP archives via unzip.",
+  "command": "/scripts/archive-unzip.py",
+  "io_mode": "file",
+  "n8n_alias": "n8n_archive_unzip",
+  "output_artifacts": true,
+  "args": [
+    {"name": "input_path", "type": "string", "required": true, "style": "flag"},
+    {"name": "output_dir", "type": "string", "required": false, "style": "flag"}
+  ]
+}

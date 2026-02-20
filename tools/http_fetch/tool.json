@@ -1,0 +1,19 @@
+{
+  "name": "http_fetch",
+  "description": "Fetch HTTP responses using requests or httpx.",
+  "command": "/scripts/http-fetch.py",
+  "io_mode": "json",
+  "n8n_alias": "n8n_http_fetch",
+  "output_artifacts": true,
+  "args": [
+    {"name": "url", "type": "string", "required": true, "style": "flag"},
+    {"name": "method", "type": "string", "required": false, "style": "flag"},
+    {"name": "backend", "type": "string", "required": false, "style": "flag"},
+    {"name": "headers_json", "type": "string", "required": false, "style": "flag"},
+    {"name": "body_json", "type": "string", "required": false, "style": "flag"},
+    {"name": "body_text", "type": "string", "required": false, "style": "flag"},
+    {"name": "timeout_seconds", "type": "string", "required": false, "style": "flag"},
+    {"name": "output_dir", "type": "string", "required": false, "style": "flag"},
+    {"name": "output_filename", "type": "string", "required": false, "style": "flag"}
+  ]
+}

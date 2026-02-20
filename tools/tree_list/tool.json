@@ -1,0 +1,14 @@
+{
+  "name": "tree_list",
+  "description": "List directory trees.",
+  "command": "/scripts/tree-list.py",
+  "io_mode": "json",
+  "n8n_alias": "n8n_tree_list",
+  "output_artifacts": true,
+  "args": [
+    {"name": "root_path", "type": "string", "required": false, "style": "flag"},
+    {"name": "max_depth", "type": "string", "required": false, "style": "flag"},
+    {"name": "output_dir", "type": "string", "required": false, "style": "flag"},
+    {"name": "output_filename", "type": "string", "required": false, "style": "flag"}
+  ]
+}

@@ -5,11 +5,14 @@ Toolhub Webhook Service
 Exposes REST endpoints:
   GET  /             Service info & available routes
   GET/POST /test     Health check
+  GET  /tools        Tool discovery catalog
   POST /n8n_audio_split  n8n-friendly upload + split endpoint
   POST /audio-ingest-split  Upload + split audio in one request
   GET  /audio-chunk/<job_id>/<filename>  Download generated chunk binary
   POST /audio-split  Split audio files from /shared/audio/in
-  POST /run          Dispatch registered Toolhub tools (e.g. docx-render)
+  POST /run          Dispatch registered Toolhub tools (JSON-first)
+  POST /run-file     Dispatch file-first Toolhub tools
+  GET  /artifacts/<job_id>/<filename>  Download run-file artifacts
 
 Logs all activity to /logs/webhook.log.
 """
@@ -25,6 +28,7 @@ import uuid
 from werkzeug.exceptions import HTTPException
 import time
 import re
+import mimetypes
 
 # Define size units
 KB = 1024
@@ -64,6 +68,43 @@ except Exception as exc:  # noqa: BLE001
 
 MANIFEST_TOOLS_DIR = os.getenv("TOOLHUB_MANIFEST_TOOLS_DIR", os.path.join(TOOLS_ROOT, "tools"))
 SCRIPT_TOOLS_DIR = os.getenv("TOOLHUB_SCRIPT_TOOLS_DIR", "/scripts")
+SHARED_ARTIFACTS_DIR = os.getenv("TOOLHUB_ARTIFACTS_DIR", "/shared/artifacts")
+
+
+def _infer_command_kind(command_path):
+    """Infer command execution mode from file extension."""
+    suffix = Path(command_path).suffix.lower()
+    if suffix == ".py":
+        return "py"
+    if suffix == ".sh":
+        return "sh"
+    return "bin"
+
+
+def _manifest_command_runnable(command_path, command_kind):
+    """Validate whether manifest command can be executed."""
+    if not os.path.isfile(command_path):
+        return False
+    if command_kind in {"py", "sh"}:
+        return True
+    return os.access(command_path, os.X_OK)
+
+
+def _resolve_manifest_command_path(tool_dir, command):
+    """Resolve manifest command paths across container and local-dev layouts."""
+    if os.path.isabs(command):
+        candidates = [command]
+        base_name = os.path.basename(command)
+        # Fall back to common script roots when /scripts is not mounted in local dev.
+        candidates.append(str(Path("/scripts") / base_name))
+        candidates.append(str(Path.cwd() / "scripts" / base_name))
+    else:
+        candidates = [os.path.normpath(os.path.join(tool_dir, command))]
+
+    for candidate in candidates:
+        if os.path.isfile(candidate):
+            return candidate
+    return candidates[0]
 
 
 def load_manifest_tools():
@@ -98,17 +139,28 @@ def load_manifest_tools():
             logger.warning(f"Skipping manifest without valid command: {manifest_path}")
             continue
 
-        # Resolve command relative to its manifest directory when necessary.
-        command_path = command if os.path.isabs(command) else os.path.normpath(os.path.join(tool_dir, command))
-        if not os.path.isfile(command_path) or not os.access(command_path, os.X_OK):
-            logger.warning(f"Skipping tool '{tool_name}' because command is not executable: {command_path}")
+        # Resolve command path with local-dev fallback support.
+        command_path = _resolve_manifest_command_path(tool_dir, command)
+        command_kind = _infer_command_kind(command_path)
+        if not _manifest_command_runnable(command_path, command_kind):
+            logger.warning(f"Skipping tool '{tool_name}' because command is not runnable: {command_path}")
             continue
+
+        try:
+            timeout_seconds = int(manifest.get("timeout_seconds", 120))
+        except Exception:  # noqa: BLE001
+            timeout_seconds = 120
 
         manifest_tools[tool_name] = {
             "name": tool_name,
             "description": manifest.get("description", ""),
             "args": manifest.get("args", []),
             "command_path": command_path,
+            "command_kind": command_kind,
+            "io_mode": str(manifest.get("io_mode", "json")).strip().lower(),
+            "n8n_alias": manifest.get("n8n_alias"),
+            "output_artifacts": bool(manifest.get("output_artifacts", False)),
+            "timeout_seconds": timeout_seconds,
         }
 
     logger.info(f"Loaded {len(manifest_tools)} manifest tool(s) from {MANIFEST_TOOLS_DIR}")
@@ -151,8 +203,6 @@ def load_script_tools():
     for entry in sorted(base_dir.iterdir(), key=lambda item: item.name):
         if not entry.is_file():
             continue
-        if not os.access(entry, os.X_OK):
-            continue
         if entry.suffix not in (".sh", ".py"):
             continue
         if entry.name == "webhook.py":
@@ -192,6 +242,14 @@ N8N_TOOL_ALIASES = {
     "n8n_docx_template_fill": "docx-template-fill",
     "n8n_audio_split_compat": "audio-split",
 }
+TOOL_ALIASES = dict(N8N_TOOL_ALIASES)
+for manifest_name, manifest in MANIFEST_TOOLS.items():
+    # Register explicit aliases from tool manifests.
+    explicit_alias = manifest.get("n8n_alias")
+    if isinstance(explicit_alias, str) and explicit_alias.strip():
+        TOOL_ALIASES[_normalise_tool_token(explicit_alias)] = manifest_name
+    # Register deterministic default aliases for n8n nodes.
+    TOOL_ALIASES.setdefault(f"n8n_{_normalise_tool_token(manifest_name)}", manifest_name)
 
 
 def parse_bool(value, default=False):
@@ -204,9 +262,9 @@ def parse_bool(value, default=False):
 def resolve_requested_tool_name(tool_name):
     """Resolve n8n alias names to canonical Toolhub tool names."""
     normalized = _normalise_tool_token(tool_name)
-    # This mapping keeps backward compatibility while providing n8n-specific names.
-    if normalized in N8N_TOOL_ALIASES:
-        return N8N_TOOL_ALIASES[normalized]
+    # Keep backward compatibility with static aliases and manifest-defined aliases.
+    if normalized in TOOL_ALIASES:
+        return TOOL_ALIASES[normalized]
     return tool_name
 
 
@@ -389,6 +447,8 @@ def build_manifest_args(request_data, manifest):
     for arg_def in arg_defs:
         arg_name = arg_def.get("name") if isinstance(arg_def, dict) else None
         required = arg_def.get("required", True) if isinstance(arg_def, dict) else True
+        style = arg_def.get("style", "positional") if isinstance(arg_def, dict) else "positional"
+        flag_name = arg_def.get("flag") if isinstance(arg_def, dict) else None
         if not arg_name:
             continue
         value = payload_map.get(arg_name)
@@ -396,37 +456,65 @@ def build_manifest_args(request_data, manifest):
             if required:
                 raise ValueError(f"Missing required argument '{arg_name}'.")
             continue
+        if style == "flag":
+            flag = str(flag_name).strip() if isinstance(flag_name, str) and flag_name.strip() else f"--{_flag_name(arg_name)}"
+            # Allow boolean flags to be passed without explicit value.
+            if isinstance(value, bool):
+                if value:
+                    resolved_args.append(flag)
+                continue
+            if isinstance(value, list):
+                for item in value:
+                    resolved_args.extend([flag, str(item)])
+                continue
+            resolved_args.extend([flag, str(value)])
+            continue
         resolved_args.append(str(value))
 
     return resolved_args
 
 
-def execute_manifest_tool(tool_name, manifest, request_data):
-    """Execute a manifest CLI tool and normalize stdout into JSON when possible."""
-    command_path = manifest["command_path"]
-    args = build_manifest_args(request_data, manifest)
-    cmd = [command_path, *args]
-    logger.info(f"Executing manifest tool '{tool_name}': {' '.join(cmd)}")
-
+def _parse_stdout_payload(stdout_text):
+    """Parse JSON payload from command stdout when available."""
+    if not stdout_text:
+        return None
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=120)
+        parsed = json.loads(stdout_text)
+    except Exception:  # noqa: BLE001
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _build_manifest_command(manifest, args):
+    """Build runnable command for manifest tools based on command kind."""
+    command_path = manifest["command_path"]
+    command_kind = manifest.get("command_kind", "bin")
+    if command_kind == "py":
+        return ["python3", command_path, *args]
+    if command_kind == "sh":
+        return ["bash", command_path, *args]
+    return [command_path, *args]
+
+
+def _run_external_tool(tool_name, cmd, timeout_seconds):
+    """Execute a subprocess tool and normalize result payload."""
+    logger.info(f"Executing tool '{tool_name}': {' '.join(cmd)}")
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=timeout_seconds)
     except subprocess.TimeoutExpired as exc:
-        logger.exception(f"Manifest tool timeout: {tool_name}")
-        return jsonify({"status": "error", "tool": tool_name, "error": {"type": "TimeoutExpired", "message": str(exc)}}), 504
+        logger.exception(f"Tool timeout: {tool_name}")
+        return {
+            "status": "error",
+            "tool": tool_name,
+            "error": {"type": "TimeoutExpired", "message": str(exc)},
+        }, 504
 
     stdout_text = (result.stdout or "").strip()
     stderr_text = (result.stderr or "").strip()
-
-    # Parse JSON output when tool scripts return structured payloads.
-    parsed_stdout = None
-    if stdout_text:
-        try:
-            parsed_stdout = json.loads(stdout_text)
-        except Exception:  # noqa: BLE001
-            parsed_stdout = None
+    parsed_stdout = _parse_stdout_payload(stdout_text)
 
     if result.returncode != 0:
-        error_payload = {
+        payload = {
             "status": "error",
             "tool": tool_name,
             "exit_code": result.returncode,
@@ -434,15 +522,22 @@ def execute_manifest_tool(tool_name, manifest, request_data):
             "stderr": stderr_text,
         }
         # Preserve structured script errors when available.
-        if isinstance(parsed_stdout, dict):
-            error_payload["result"] = parsed_stdout
-        return jsonify(error_payload), 400
+        if parsed_stdout is not None:
+            payload["result"] = parsed_stdout
+        return payload, 400
 
-    # Return structured script result directly when possible.
-    if isinstance(parsed_stdout, dict):
-        return jsonify(parsed_stdout), 200
+    if parsed_stdout is not None:
+        return parsed_stdout, 200
 
-    return jsonify({"status": "ok", "tool": tool_name, "stdout": stdout_text, "stderr": stderr_text}), 200
+    return {"status": "ok", "tool": tool_name, "stdout": stdout_text, "stderr": stderr_text}, 200
+
+
+def execute_manifest_tool(tool_name, manifest, request_data):
+    """Execute a manifest CLI tool and return normalized payload tuple."""
+    args = build_manifest_args(request_data, manifest)
+    cmd = _build_manifest_command(manifest, args)
+    timeout_seconds = int(manifest.get("timeout_seconds", 120))
+    return _run_external_tool(tool_name, cmd, timeout_seconds)
 
 
 def build_script_args(request_data):
@@ -504,39 +599,57 @@ def execute_script_tool(tool_name, tool, request_data):
     else:
         cmd = ["bash", script_path, *args]
 
-    logger.info(f"Executing script tool '{tool_name}': {' '.join(cmd)}")
+    return _run_external_tool(tool_name, cmd, 600)
+
+
+def execute_python_tool(tool_name, tool_payload):
+    """Execute in-process Python registry tools with normalized error handling."""
+    handler = TOOLS[tool_name].get("handler")
+    if handler is None:
+        logger.error(f"Handler missing for tool: {tool_name}")
+        return {"status": "error", "error": {"type": "ConfigError", "message": f"Tool '{tool_name}' is not configured"}}, 500
+
+    logger.info(
+        f"Dispatching Python tool '{tool_name}' with payload keys: {list(tool_payload.keys()) if isinstance(tool_payload, dict) else 'n/a'}"
+    )
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=600)
-    except subprocess.TimeoutExpired as exc:
-        logger.exception(f"Script tool timeout: {tool_name}")
-        return jsonify({"status": "error", "tool": tool_name, "error": {"type": "TimeoutExpired", "message": str(exc)}}), 504
+        result = handler(tool_payload if isinstance(tool_payload, dict) else {})
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Python tool execution failed", exc_info=exc)
+        return {
+            "status": "error",
+            "error": {"type": exc.__class__.__name__, "message": str(exc)},
+        }, 500
 
-    stdout_text = (result.stdout or "").strip()
-    stderr_text = (result.stderr or "").strip()
+    status_code = 200 if isinstance(result, dict) and result.get("status") == "ok" else 400
+    if isinstance(result, dict):
+        return result, status_code
+    return {"status": "ok", "result": result}, status_code
 
-    parsed_stdout = None
-    if stdout_text:
-        try:
-            parsed_stdout = json.loads(stdout_text)
-        except Exception:  # noqa: BLE001
-            parsed_stdout = None
 
-    if result.returncode != 0:
-        return jsonify(
-            {
-                "status": "error",
-                "tool": tool_name,
-                "exit_code": result.returncode,
-                "stdout": stdout_text,
-                "stderr": stderr_text,
-                "result": parsed_stdout if isinstance(parsed_stdout, dict) else None,
-            }
-        ), 400
+def dispatch_tool_payload(request_payload, requested_tool_name):
+    """Dispatch payload to python, manifest, or script tools."""
+    tool_payload = request_payload.get("payload") if isinstance(request_payload, dict) else {}
+    tool_name = resolve_requested_tool_name(requested_tool_name)
+    logger.info(f"Resolved tool request: requested_tool='{requested_tool_name}', resolved_tool='{tool_name}'")
 
-    if isinstance(parsed_stdout, dict):
-        return jsonify(parsed_stdout), 200
+    if tool_name in TOOLS:
+        return execute_python_tool(tool_name, tool_payload if isinstance(tool_payload, dict) else {})
 
-    return jsonify({"status": "ok", "tool": tool_name, "stdout": stdout_text, "stderr": stderr_text}), 200
+    if tool_name in MANIFEST_TOOLS:
+        return execute_manifest_tool(tool_name, MANIFEST_TOOLS[tool_name], request_payload)
+
+    normalised_tool_name = _normalise_tool_token(tool_name)
+    if normalised_tool_name in SCRIPT_TOOLS:
+        return execute_script_tool(normalised_tool_name, SCRIPT_TOOLS[normalised_tool_name], request_payload)
+
+    logger.warning(f"Requested unknown tool: {tool_name}")
+    return {
+        "status": "error",
+        "error": f"Unknown tool '{requested_tool_name}'",
+        "resolved_tool": tool_name,
+        "hint": "Use /tools to inspect available tool names and aliases.",
+    }, 404
 
 
 app = Flask(__name__)
@@ -612,11 +725,14 @@ def index():
         "endpoints": {
             "/":           "This help message",
             "/test":       "GET or POST health-check",
+            "/tools":      "GET discovered tools and aliases",
             "/n8n_audio_split": "POST multipart/form-data {audio,...} → n8n-first upload + split + chunk manifest",
             "/audio-ingest-split": "POST multipart/form-data {audio,...} → ingest + split + chunk manifest",
             "/audio-chunk/<job_id>/<filename>": "GET chunk binary from /shared/audio/out/<job_id>",
             "/audio-split":"POST JSON {filename, mode, …} → split audio from /shared",
-            "/run":        "POST JSON {tool, payload|args} → run Python, manifest, or script tool"
+            "/run":        "POST JSON {tool, payload|args} → run JSON/CLI tools",
+            "/run-file":   "POST multipart/form-data {tool,file,payload?} → run file-first tools",
+            "/artifacts/<job_id>/<filename>": "GET artifact binary from /shared/artifacts/<job_id>",
         }
     }), 200
 
@@ -631,6 +747,92 @@ def test():
     return jsonify({"status": "ok", "message": "Toolhub webhook service is running", "received": data})
 
 
+def _collect_tool_catalog():
+    """Build a serializable list of discovered tools across all backends."""
+    catalog = []
+
+    # Keep Python registry tools visible even when they do not expose argument schemas.
+    for name, config in sorted(TOOLS.items()):
+        catalog.append(
+            {
+                "name": name,
+                "kind": "python",
+                "description": config.get("description", ""),
+                "io_mode": "json",
+                "n8n_alias": TOOL_ALIASES.get(f"n8n_{_normalise_tool_token(name)}", f"n8n_{_normalise_tool_token(name)}"),
+            }
+        )
+
+    # Include manifest tools because they carry explicit argument contracts.
+    for name, manifest in sorted(MANIFEST_TOOLS.items()):
+        catalog.append(
+            {
+                "name": name,
+                "kind": "manifest",
+                "description": manifest.get("description", ""),
+                "args": manifest.get("args", []),
+                "io_mode": manifest.get("io_mode", "json"),
+                "n8n_alias": manifest.get("n8n_alias") or f"n8n_{_normalise_tool_token(name)}",
+                "output_artifacts": bool(manifest.get("output_artifacts", False)),
+            }
+        )
+
+    # Include canonical script names only to avoid duplicate alias rows.
+    seen_script_names = set()
+    for key, script in sorted(SCRIPT_TOOLS.items()):
+        canonical = script.get("name")
+        if key != canonical or canonical in seen_script_names:
+            continue
+        seen_script_names.add(canonical)
+        catalog.append(
+            {
+                "name": canonical,
+                "kind": "script",
+                "description": f"Discovered script tool from {script.get('path')}",
+                "io_mode": "json",
+            }
+        )
+
+    return catalog
+
+
+def _artifact_mime_type(file_name):
+    """Resolve best-effort MIME type for generic artifacts."""
+    guessed, _ = mimetypes.guess_type(file_name)
+    return guessed or "application/octet-stream"
+
+
+def _list_artifacts(job_id, output_dir):
+    """Collect generated artifact metadata for run-file responses."""
+    host_base = request.host_url.rstrip("/")
+    artifacts = []
+    if not os.path.isdir(output_dir):
+        return artifacts
+
+    for root, _dirs, files in os.walk(output_dir):
+        for file_name in sorted(files):
+            abs_path = os.path.join(root, file_name)
+            if not os.path.isfile(abs_path):
+                continue
+            rel_path = os.path.relpath(abs_path, output_dir).replace(os.sep, "/")
+            artifacts.append(
+                {
+                    "filename": rel_path,
+                    "path": abs_path,
+                    "size": os.path.getsize(abs_path),
+                    "mimeType": _artifact_mime_type(rel_path),
+                    "downloadUrl": f"{host_base}/artifacts/{job_id}/{rel_path}",
+                }
+            )
+    return artifacts
+
+
+@app.route("/tools", methods=["GET"])
+def tools():
+    """Expose discovered tool metadata for API clients and n8n nodes."""
+    return jsonify({"status": "ok", "aliases": TOOL_ALIASES, "tools": _collect_tool_catalog()}), 200
+
+
 # --- GENERIC TOOL DISPATCH ---
 @app.route("/run", methods=["POST"])
 def run_tool():
@@ -638,71 +840,128 @@ def run_tool():
     if not isinstance(payload, dict):
         return jsonify({"error": "request body must be a JSON object"}), 400
 
-    requested_tool_name = payload.get("tool") if isinstance(payload, dict) else None
-    tool_payload = payload.get("payload") if isinstance(payload, dict) else {}
-
+    requested_tool_name = payload.get("tool")
     if not requested_tool_name:
         return jsonify({"error": "tool is required"}), 400
 
-    # Resolve n8n alias names before dispatching to existing handlers.
-    tool_name = resolve_requested_tool_name(requested_tool_name)
-    logger.info(f"Resolved tool request: requested_tool='{requested_tool_name}', resolved_tool='{tool_name}'")
+    try:
+        result_payload, status_code = dispatch_tool_payload(payload, requested_tool_name)
+    except ValueError as exc:
+        logger.warning("Validation error while dispatching tool", exc_info=exc)
+        return jsonify({"status": "error", "error": {"type": "ValidationError", "message": str(exc)}}), 400
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Unexpected dispatch error", exc_info=exc)
+        return jsonify({"status": "error", "error": {"type": exc.__class__.__name__, "message": str(exc)}}), 500
 
-    # Dispatch Python in-process handlers first.
-    if tool_name in TOOLS:
-        handler = TOOLS[tool_name].get("handler")
-        if handler is None:
-            logger.error(f"Handler missing for tool: {tool_name}")
-            return jsonify({"error": f"Tool '{tool_name}' is not configured"}), 500
+    return jsonify(result_payload), status_code
 
-        logger.info(
-            f"Dispatching Python tool '{tool_name}' with payload keys: {list(tool_payload.keys()) if isinstance(tool_payload, dict) else 'n/a'}"
-        )
+
+@app.route("/run-file", methods=["POST"])
+def run_file_tool():
+    """Dispatch file-first tool calls with artifact tracking."""
+    requested_tool_name = (request.form.get("tool") or "").strip()
+    if not requested_tool_name:
+        return jsonify({"status": "error", "error": {"type": "ValidationError", "message": "Missing form field 'tool'"}}), 400
+
+    if "file" not in request.files:
+        return jsonify({"status": "error", "error": {"type": "ValidationError", "message": "Missing multipart file field 'file'"}}), 400
+
+    payload_field = (request.form.get("payload") or "").strip()
+    payload_obj = {}
+    if payload_field:
         try:
-            result = handler(tool_payload if isinstance(tool_payload, dict) else {})
+            decoded = json.loads(payload_field)
         except Exception as exc:  # noqa: BLE001
-            logger.exception("Python tool execution failed", exc_info=exc)
-            return (
-                jsonify(
-                    {
-                        "status": "error",
-                        "error": {"type": exc.__class__.__name__, "message": str(exc)},
-                    }
-                ),
-                500,
-            )
+            return jsonify({"status": "error", "error": {"type": "ValidationError", "message": f"Invalid payload JSON: {exc}"}}), 400
+        if not isinstance(decoded, dict):
+            return jsonify({"status": "error", "error": {"type": "ValidationError", "message": "payload must decode to a JSON object"}}), 400
+        payload_obj = decoded
 
-        status_code = 200 if isinstance(result, dict) and result.get("status") == "ok" else 400
-        return jsonify(result), status_code
+    # Allow simple form fields in addition to the JSON payload field.
+    for key, value in request.form.items():
+        if key in {"tool", "payload"}:
+            continue
+        payload_obj.setdefault(key, value)
 
-    # Fallback to manifest-based external CLI tools.
-    if tool_name in MANIFEST_TOOLS:
-        try:
-            return execute_manifest_tool(tool_name, MANIFEST_TOOLS[tool_name], payload)
-        except ValueError as exc:
-            logger.warning(f"Invalid manifest tool request for '{tool_name}': {exc}")
-            return jsonify({"status": "error", "tool": tool_name, "error": {"type": "ValidationError", "message": str(exc)}}), 400
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("Manifest tool execution failed", exc_info=exc)
-            return jsonify({"status": "error", "tool": tool_name, "error": {"type": exc.__class__.__name__, "message": str(exc)}}), 500
+    upload_file = request.files["file"]
+    safe_name = secure_filename(upload_file.filename or "")
+    if not safe_name:
+        safe_name = "input.bin"
 
-    normalised_tool_name = _normalise_tool_token(tool_name)
-    if normalised_tool_name in SCRIPT_TOOLS:
-        try:
-            return execute_script_tool(normalised_tool_name, SCRIPT_TOOLS[normalised_tool_name], payload)
-        except ValueError as exc:
-            logger.warning(f"Invalid script tool request for '{tool_name}': {exc}")
-            return jsonify({"status": "error", "tool": tool_name, "error": {"type": "ValidationError", "message": str(exc)}}), 400
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("Script tool execution failed", exc_info=exc)
-            return jsonify({"status": "error", "tool": tool_name, "error": {"type": exc.__class__.__name__, "message": str(exc)}}), 500
+    # Store each run-file request in its own artifact directory.
+    job_id = str(uuid.uuid4())
+    output_dir = os.path.join(SHARED_ARTIFACTS_DIR, job_id)
+    os.makedirs(output_dir, exist_ok=True)
 
-    logger.warning(f"Requested unknown tool: {tool_name}")
-    return jsonify({
-        "error": f"Unknown tool '{requested_tool_name}'",
-        "resolved_tool": tool_name,
-        "hint": "Use / (index) to inspect endpoints and ensure the tool exists in Python registry, manifest tools, or /scripts."
-    }), 404
+    input_path = os.path.join(output_dir, f"input_{safe_name}")
+    upload_file.save(input_path)
+
+    # Inject deterministic defaults so wrappers can consume paths without boilerplate.
+    payload_obj.setdefault("input_path", input_path)
+    payload_obj.setdefault("output_dir", output_dir)
+    payload_obj.setdefault("input_filename", safe_name)
+
+    dispatch_request = {"tool": requested_tool_name, "payload": payload_obj}
+    try:
+        tool_result, status_code = dispatch_tool_payload(dispatch_request, requested_tool_name)
+    except ValueError as exc:
+        logger.warning("Validation error while dispatching file tool", exc_info=exc)
+        tool_result = {"status": "error", "error": {"type": "ValidationError", "message": str(exc)}}
+        status_code = 400
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Unexpected file dispatch error", exc_info=exc)
+        tool_result = {"status": "error", "error": {"type": exc.__class__.__name__, "message": str(exc)}}
+        status_code = 500
+
+    artifacts = _list_artifacts(job_id, output_dir)
+    # Hide the uploaded source file from artifact output by default.
+    artifacts = [artifact for artifact in artifacts if artifact.get("path") != input_path]
+    response_payload = {
+        "status": "ok" if status_code < 400 else "error",
+        "requested_tool": requested_tool_name,
+        "resolved_tool": resolve_requested_tool_name(requested_tool_name),
+        "job_id": job_id,
+        "input": {"filename": safe_name, "path": input_path},
+        "result": tool_result,
+        "artifacts": artifacts,
+    }
+    return jsonify(response_payload), status_code
+
+
+@app.route("/artifacts/<job_id>/<path:filename>", methods=["GET"])
+def artifact_download(job_id, filename):
+    """Download generated artifacts from run-file jobs."""
+    if not SAFE_JOB_ID_PATTERN.match(job_id):
+        return jsonify({"error": "ValidationError", "message": "Invalid job_id format"}), 400
+
+    raw_name = (filename or "").strip()
+    if not raw_name:
+        return jsonify({"error": "ValidationError", "message": "Invalid artifact filename"}), 400
+
+    # Keep nested artifact paths but sanitize every path segment.
+    path_obj = Path(raw_name)
+    if path_obj.is_absolute() or ".." in path_obj.parts:
+        return jsonify({"error": "ValidationError", "message": "Invalid artifact path"}), 400
+
+    safe_parts = [secure_filename(part) for part in path_obj.parts if part not in {"", "."}]
+    if not safe_parts or any(not part for part in safe_parts):
+        return jsonify({"error": "ValidationError", "message": "Invalid artifact filename"}), 400
+    safe_name = "/".join(safe_parts)
+
+    job_root = os.path.realpath(os.path.join(SHARED_ARTIFACTS_DIR, job_id))
+    target_path = os.path.realpath(os.path.join(job_root, safe_name))
+    if not target_path.startswith(job_root + os.sep):
+        return jsonify({"error": "ValidationError", "message": "Invalid artifact path"}), 400
+
+    if not os.path.isfile(target_path):
+        return jsonify({"error": "NotFound", "message": "Artifact file not found"}), 404
+
+    return send_file(
+        target_path,
+        mimetype=_artifact_mime_type(safe_name),
+        as_attachment=False,
+        download_name=safe_name,
+    )
 
 
 def handle_multipart_audio_split(endpoint_label):

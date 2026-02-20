@@ -34,6 +34,8 @@ Nicht relevant (Webhook-Dispatcher).
 - `n8n_docx_render` -> `docx-render`
 - `n8n_docx_template_fill` -> `docx-template-fill`
 - `n8n_audio_split_compat` -> `audio-split`
+- zusätzliche Aliase aus `tools/*/tool.json` über Feld `n8n_alias`
+- Default-Alias pro Manifest-Tool: `n8n_<tool_name>`
 
 ### Beispiele
 

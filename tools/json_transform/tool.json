@@ -1,0 +1,15 @@
+{
+  "name": "json_transform",
+  "description": "Transform JSON using jq expressions.",
+  "command": "/scripts/json-transform.py",
+  "io_mode": "json",
+  "n8n_alias": "n8n_json_transform",
+  "output_artifacts": true,
+  "args": [
+    {"name": "input_path", "type": "string", "required": false, "style": "flag"},
+    {"name": "json_input", "type": "string", "required": false, "style": "flag"},
+    {"name": "filter", "type": "string", "required": false, "style": "flag"},
+    {"name": "output_dir", "type": "string", "required": false, "style": "flag"},
+    {"name": "output_filename", "type": "string", "required": false, "style": "flag"}
+  ]
+}

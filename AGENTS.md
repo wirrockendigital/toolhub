@@ -67,6 +67,16 @@ This file documents the responsibilities and capabilities of automated agents or
   - Positional target argument (MAC address or mapped device name)
 - **Logging:** Returns JSON to caller; errors are captured by caller logs (`webhook.log`/MCP output).
 
+### 8. Wave Tool Scripts (Document/Media/Utility)
+- **Location:** `/scripts/*.py`
+- **Purpose:** Additional file-first and JSON-first tools that are exposed uniformly via webhook (`/run`, `/run-file`), MCP discovery, and n8n community nodes.
+- **Included scripts:**
+  - Document/PDF/OCR: `pdf-extract-text.py`, `pdf-info-read.py`, `ocr-image.py`, `html-to-markdown.py`, `markdown-to-html.py`, `document-convert.py`, `xlsx-read.py`
+  - Media/Image/Data: `image-convert.py`, `gif-optimize.py`, `image-metadata.py`, `audio-convert.py`, `json-transform.py`, `yaml-transform.py`, `array-stats.py`
+  - Utility/Network/Git: `http-fetch.py`, `download-aria2.py`, `download-wget.py`, `curl-request.py`, `archive-unzip.py`, `tree-list.py`, `calc-bc.py`, `git-ops.py`, `watch-path.py`
+- **Parameters:** Each script accepts CLI flags (`--input-path`, `--output-dir`, etc.) documented in MCP metadata blocks and `tools/*/tool.json`.
+- **Logging/Output:** Scripts emit compact JSON on stdout; webhook and MCP return this output directly and expose generated files through artifact paths.
+
 ## Logging Policy
 All agents should log to the `/logs` directory. In integration workflows (webhook/MCP), compact JSON on stdout is allowed for machine-readable responses.
 

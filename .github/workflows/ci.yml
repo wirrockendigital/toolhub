@@ -53,10 +53,10 @@ jobs:
 
       - name: Validate Python module syntax
         run: |
-          python -m py_compile scripts/webhook.py
+          python -m py_compile scripts/*.py
           python -m py_compile mcp_tools/docx_template_fill/renderer.py
           python -m py_compile mcp_tools/docx_template_fill/tool.py
           python -m py_compile mcp_tools/docx_template_fill/validators.py
 
-      - name: Run docx template-fill tests
-        run: python -m unittest -q tests/docx_template_fill/test_tool.py
+      - name: Run Python unit tests
+        run: python -m unittest -q tests/docx_template_fill/test_tool.py tests/tool_scripts/test_array_stats.py

@@ -1,0 +1,14 @@
+{
+  "name": "ocr_image",
+  "description": "Perform OCR on image files via tesseract.",
+  "command": "/scripts/ocr-image.py",
+  "io_mode": "file",
+  "n8n_alias": "n8n_ocr_image",
+  "output_artifacts": true,
+  "args": [
+    {"name": "input_path", "type": "string", "required": true, "style": "flag"},
+    {"name": "lang", "type": "string", "required": false, "style": "flag"},
+    {"name": "output_dir", "type": "string", "required": false, "style": "flag"},
+    {"name": "output_filename", "type": "string", "required": false, "style": "flag"}
+  ]
+}

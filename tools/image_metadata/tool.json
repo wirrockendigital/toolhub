@@ -1,0 +1,13 @@
+{
+  "name": "image_metadata",
+  "description": "Extract image metadata via exiftool.",
+  "command": "/scripts/image-metadata.py",
+  "io_mode": "file",
+  "n8n_alias": "n8n_image_metadata",
+  "output_artifacts": true,
+  "args": [
+    {"name": "input_path", "type": "string", "required": true, "style": "flag"},
+    {"name": "output_dir", "type": "string", "required": false, "style": "flag"},
+    {"name": "output_filename", "type": "string", "required": false, "style": "flag"}
+  ]
+}

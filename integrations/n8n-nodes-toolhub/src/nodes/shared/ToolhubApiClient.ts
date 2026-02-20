@@ -120,3 +120,38 @@ export async function requestToolhubBuffer(
 
 	return Buffer.from(JSON.stringify(response ?? {}));
 }
+
+export async function requestToolhubMultipart(
+	context: IExecuteFunctions,
+	options: {
+		url: string;
+		headers?: IDataObject;
+		formData: IDataObject;
+		timeout?: number;
+	},
+): Promise<IDataObject> {
+	// Multipart requests are used by /run-file style tool execution.
+	return requestToolhubJson(context, {
+		url: options.url,
+		method: 'POST',
+		headers: options.headers,
+		formData: options.formData,
+		timeout: options.timeout,
+	});
+}
+
+export async function requestToolhubArtifact(
+	context: IExecuteFunctions,
+	options: {
+		url: string;
+		headers?: IDataObject;
+		timeout?: number;
+	},
+): Promise<Buffer> {
+	// Artifact downloads reuse the generic binary helper for consistency.
+	return requestToolhubBuffer(context, {
+		url: options.url,
+		headers: options.headers,
+		timeout: options.timeout,
+	});
+}

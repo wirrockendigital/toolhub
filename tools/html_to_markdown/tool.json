@@ -1,0 +1,15 @@
+{
+  "name": "html_to_markdown",
+  "description": "Convert HTML to Markdown.",
+  "command": "/scripts/html-to-markdown.py",
+  "io_mode": "json",
+  "n8n_alias": "n8n_html_to_markdown",
+  "output_artifacts": true,
+  "args": [
+    {"name": "input_path", "type": "string", "required": false, "style": "flag"},
+    {"name": "html", "type": "string", "required": false, "style": "flag"},
+    {"name": "backend", "type": "string", "required": false, "style": "flag"},
+    {"name": "output_dir", "type": "string", "required": false, "style": "flag"},
+    {"name": "output_filename", "type": "string", "required": false, "style": "flag"}
+  ]
+}

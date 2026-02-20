@@ -33,8 +33,17 @@ const CLI_WHITELIST: Array<{
   { name: "pdftotext", commands: ["pdftotext"], description: "Execute pdftotext from poppler-utils." },
   { name: "pdfinfo", commands: ["pdfinfo"], description: "Execute pdfinfo from poppler-utils." },
   { name: "jq", commands: ["jq"], description: "Execute the jq JSON processor." },
+  { name: "yq", commands: ["yq"], description: "Execute the yq YAML processor." },
+  { name: "wget", commands: ["wget"], description: "Execute wget for file downloads." },
+  { name: "aria2c", commands: ["aria2c"], description: "Execute aria2c for multi-connection downloads." },
   { name: "curl", commands: ["curl"], description: "Execute curl for HTTP requests (restricted by allowlist)." },
   { name: "exiftool", commands: ["exiftool"], description: "Execute ExifTool metadata inspector." },
+  { name: "gifsicle", commands: ["gifsicle"], description: "Execute gifsicle GIF optimization CLI." },
+  { name: "tree", commands: ["tree"], description: "Execute tree for directory listings." },
+  { name: "unzip", commands: ["unzip"], description: "Execute unzip for archive extraction." },
+  { name: "bc", commands: ["bc"], description: "Execute bc command-line calculator." },
+  { name: "git", commands: ["git"], description: "Execute git version-control CLI." },
+  { name: "wakeonlan", commands: ["wakeonlan"], description: "Execute wakeonlan magic-packet CLI." },
   { name: "syft", commands: ["syft"], description: "Execute Anchore Syft software bill-of-materials scanner." },
   { name: "grype", commands: ["grype"], description: "Execute Anchore Grype vulnerability scanner." },
   { name: "trivy", commands: ["trivy"], description: "Execute Trivy vulnerability scanner." },
@@ -453,9 +462,24 @@ async function loadManifestTools(config: McpConfig, limiter: RateLimiter): Promi
       continue;
     }
 
-    const commandPath = path.isAbsolute(manifest.command)
-      ? manifest.command
-      : path.resolve(baseDir, entry.name, manifest.command);
+    const commandPathCandidates = path.isAbsolute(manifest.command)
+      ? [
+          manifest.command,
+          path.resolve("/app/scripts", path.basename(manifest.command)),
+          path.resolve(process.cwd(), "scripts", path.basename(manifest.command)),
+        ]
+      : [path.resolve(baseDir, entry.name, manifest.command)];
+
+    let commandPath = commandPathCandidates[0];
+    for (const candidate of commandPathCandidates) {
+      try {
+        await fs.access(candidate, fsConstants.X_OK);
+        commandPath = candidate;
+        break;
+      } catch (error) {
+        continue;
+      }
+    }
 
     try {
       await fs.access(commandPath, fsConstants.X_OK);

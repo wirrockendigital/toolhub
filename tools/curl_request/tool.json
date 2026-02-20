@@ -1,0 +1,16 @@
+{
+  "name": "curl_request",
+  "description": "Execute HTTP requests via curl.",
+  "command": "/scripts/curl-request.py",
+  "io_mode": "json",
+  "n8n_alias": "n8n_curl_request",
+  "output_artifacts": true,
+  "args": [
+    {"name": "url", "type": "string", "required": true, "style": "flag"},
+    {"name": "method", "type": "string", "required": false, "style": "flag"},
+    {"name": "headers_json", "type": "string", "required": false, "style": "flag"},
+    {"name": "body_text", "type": "string", "required": false, "style": "flag"},
+    {"name": "output_dir", "type": "string", "required": false, "style": "flag"},
+    {"name": "output_filename", "type": "string", "required": false, "style": "flag"}
+  ]
+}

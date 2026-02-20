@@ -30,3 +30,4 @@ Diese Doku ist nach Funktionen strukturiert. Jede Funktion enthält die Kanäle:
 9. [Generic Tool Dispatcher `/run`](./09-run-dispatcher.md)
 10. [MCP Zusatztools (optional)](./10-mcp-zusatztools.md)
 11. [Quickstart iOS -> n8n -> Toolhub -> OpenAI -> Notion](./11-quickstart-ios-n8n-toolhub-openai-notion.md)
+12. [Generic File Dispatcher `/run-file`](./12-run-file-dispatcher.md)

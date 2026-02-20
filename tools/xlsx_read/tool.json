@@ -1,0 +1,14 @@
+{
+  "name": "xlsx_read",
+  "description": "Read XLSX sheets into JSON.",
+  "command": "/scripts/xlsx-read.py",
+  "io_mode": "file",
+  "n8n_alias": "n8n_xlsx_read",
+  "output_artifacts": true,
+  "args": [
+    {"name": "input_path", "type": "string", "required": true, "style": "flag"},
+    {"name": "max_rows", "type": "string", "required": false, "style": "flag"},
+    {"name": "output_dir", "type": "string", "required": false, "style": "flag"},
+    {"name": "output_filename", "type": "string", "required": false, "style": "flag"}
+  ]
+}

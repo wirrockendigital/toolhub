@@ -39,6 +39,7 @@ for dir in \
   "$TOOLHUB_PROJECT_ROOT/scripts" \
   "$TOOLHUB_PROJECT_ROOT/cron.d" \
   "$TOOLHUB_PROJECT_ROOT/logs" \
+  "$TOOLHUB_PROJECT_ROOT/shared/artifacts" \
   "$TOOLHUB_PROJECT_ROOT/shared/audio/in" \
   "$TOOLHUB_PROJECT_ROOT/shared/audio/out" \
   "$TOOLHUB_PROJECT_ROOT/data/templates" \

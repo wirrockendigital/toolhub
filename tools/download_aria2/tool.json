@@ -1,0 +1,13 @@
+{
+  "name": "download_aria2",
+  "description": "Download files via aria2c.",
+  "command": "/scripts/download-aria2.py",
+  "io_mode": "json",
+  "n8n_alias": "n8n_download_aria2",
+  "output_artifacts": true,
+  "args": [
+    {"name": "url", "type": "string", "required": true, "style": "flag"},
+    {"name": "output_dir", "type": "string", "required": false, "style": "flag"},
+    {"name": "output_filename", "type": "string", "required": false, "style": "flag"}
+  ]
+}

@@ -2,17 +2,18 @@
 
 GHCR_REPO=ghcr.io/wirrockendigital/toolhub
 IMAGE_TAG=latest
-PLATFORM=linux/amd64
+LOCAL_PLATFORM?=linux/amd64
+PLATFORMS?=linux/amd64,linux/arm64
 
 .PHONY: build push run clean wol-test
 
 build:
-	docker buildx build --platform=$(PLATFORM) \
+	docker buildx build --platform=$(LOCAL_PLATFORM) \
 		-t $(GHCR_REPO):$(IMAGE_TAG) \
 		--load .
 
 push:
-	docker buildx build --platform=$(PLATFORM) \
+	docker buildx build --platform=$(PLATFORMS) \
 		-t $(GHCR_REPO):$(IMAGE_TAG) \
 		--push .
 

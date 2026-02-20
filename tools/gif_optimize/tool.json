@@ -1,0 +1,14 @@
+{
+  "name": "gif_optimize",
+  "description": "Optimize GIF files with gifsicle.",
+  "command": "/scripts/gif-optimize.py",
+  "io_mode": "file",
+  "n8n_alias": "n8n_gif_optimize",
+  "output_artifacts": true,
+  "args": [
+    {"name": "input_path", "type": "string", "required": true, "style": "flag"},
+    {"name": "optimization_level", "type": "string", "required": false, "style": "flag"},
+    {"name": "output_dir", "type": "string", "required": false, "style": "flag"},
+    {"name": "output_filename", "type": "string", "required": false, "style": "flag"}
+  ]
+}

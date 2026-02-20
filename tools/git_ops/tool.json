@@ -1,0 +1,15 @@
+{
+  "name": "git_ops",
+  "description": "Execute git commands in a target repository.",
+  "command": "/scripts/git-ops.py",
+  "io_mode": "json",
+  "n8n_alias": "n8n_git_ops",
+  "output_artifacts": true,
+  "args": [
+    {"name": "repo_path", "type": "string", "required": true, "style": "flag"},
+    {"name": "command", "type": "string", "required": true, "style": "flag"},
+    {"name": "args_json", "type": "string", "required": false, "style": "flag"},
+    {"name": "output_dir", "type": "string", "required": false, "style": "flag"},
+    {"name": "output_filename", "type": "string", "required": false, "style": "flag"}
+  ]
+}

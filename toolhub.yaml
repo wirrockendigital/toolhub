@@ -31,6 +31,7 @@ services:
       # Keep /run script and manifest discovery explicit and overridable.
       TOOLHUB_MANIFEST_TOOLS_DIR: "${TOOLHUB_MANIFEST_TOOLS_DIR}"
       TOOLHUB_SCRIPT_TOOLS_DIR: "${TOOLHUB_SCRIPT_TOOLS_DIR}"
+      TOOLHUB_ARTIFACTS_DIR: "${TOOLHUB_ARTIFACTS_DIR}"
       # Keep DOCX tool roots/logging configurable from the stack environment.
       DOCX_TEMPLATE_ROOT: "${DOCX_TEMPLATE_ROOT}"
       DOCX_OUTPUT_ROOT: "${DOCX_OUTPUT_ROOT}"

@@ -1,0 +1,13 @@
+{
+  "name": "calc_bc",
+  "description": "Evaluate expressions with bc.",
+  "command": "/scripts/calc-bc.py",
+  "io_mode": "json",
+  "n8n_alias": "n8n_calc_bc",
+  "output_artifacts": true,
+  "args": [
+    {"name": "expression", "type": "string", "required": true, "style": "flag"},
+    {"name": "output_dir", "type": "string", "required": false, "style": "flag"},
+    {"name": "output_filename", "type": "string", "required": false, "style": "flag"}
+  ]
+}

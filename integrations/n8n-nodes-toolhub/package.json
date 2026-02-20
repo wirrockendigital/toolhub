@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-toolhub",
-  "version": "0.1.0",
+  "version": "0.2.5",
   "description": "Toolhub community nodes for n8n with audio-first namespace integration.",
   "license": "MIT",
   "type": "commonjs",
@@ -45,7 +45,29 @@
       "dist/nodes/ToolhubAudioCleanup/ToolhubAudioCleanup.node.js",
       "dist/nodes/ToolhubWol/ToolhubWol.node.js",
       "dist/nodes/ToolhubDocxRender/ToolhubDocxRender.node.js",
-      "dist/nodes/ToolhubDocxTemplateFill/ToolhubDocxTemplateFill.node.js"
+      "dist/nodes/ToolhubDocxTemplateFill/ToolhubDocxTemplateFill.node.js",
+      "dist/nodes/ToolhubPdfExtractText/ToolhubPdfExtractText.node.js",
+      "dist/nodes/ToolhubPdfInfoRead/ToolhubPdfInfoRead.node.js",
+      "dist/nodes/ToolhubOcrImage/ToolhubOcrImage.node.js",
+      "dist/nodes/ToolhubDocumentConvert/ToolhubDocumentConvert.node.js",
+      "dist/nodes/ToolhubXlsxRead/ToolhubXlsxRead.node.js",
+      "dist/nodes/ToolhubImageConvert/ToolhubImageConvert.node.js",
+      "dist/nodes/ToolhubGifOptimize/ToolhubGifOptimize.node.js",
+      "dist/nodes/ToolhubImageMetadata/ToolhubImageMetadata.node.js",
+      "dist/nodes/ToolhubAudioConvert/ToolhubAudioConvert.node.js",
+      "dist/nodes/ToolhubArchiveUnzip/ToolhubArchiveUnzip.node.js",
+      "dist/nodes/ToolhubHtmlToMarkdown/ToolhubHtmlToMarkdown.node.js",
+      "dist/nodes/ToolhubMarkdownToHtml/ToolhubMarkdownToHtml.node.js",
+      "dist/nodes/ToolhubJsonTransform/ToolhubJsonTransform.node.js",
+      "dist/nodes/ToolhubYamlTransform/ToolhubYamlTransform.node.js",
+      "dist/nodes/ToolhubArrayStats/ToolhubArrayStats.node.js",
+      "dist/nodes/ToolhubHttpFetch/ToolhubHttpFetch.node.js",
+      "dist/nodes/ToolhubDownloadAria2/ToolhubDownloadAria2.node.js",
+      "dist/nodes/ToolhubDownloadWget/ToolhubDownloadWget.node.js",
+      "dist/nodes/ToolhubCurlRequest/ToolhubCurlRequest.node.js",
+      "dist/nodes/ToolhubTreeList/ToolhubTreeList.node.js",
+      "dist/nodes/ToolhubCalcBc/ToolhubCalcBc.node.js",
+      "dist/nodes/ToolhubGitOps/ToolhubGitOps.node.js"
     ]
   }
 }

@@ -25,8 +25,17 @@ Derzeit keine dedizierten Nodes für diese MCP-Zusatztools.
 - `pdftotext`
 - `pdfinfo`
 - `jq`
+- `yq`
 - `curl`
+- `wget`
+- `aria2c`
 - `exiftool`
+- `gifsicle`
+- `tree`
+- `unzip`
+- `bc`
+- `git`
+- `wakeonlan`
 - `syft`
 - `grype`
 - `trivy`

@@ -14,7 +14,7 @@ This guide documents the public community package:
 
 - n8n display names always start with `Toolhub ...`.
 - Audio functions are grouped under `Toolhub Audio ...`.
-- Toolhub backend aliases used by these nodes start with `n8n_audio_*` where applicable.
+- Toolhub backend aliases used by these nodes start with `n8n_*`.
 
 ## Provided nodes
 
@@ -25,14 +25,34 @@ This guide documents the public community package:
 5. `Toolhub WOL`
 6. `Toolhub DOCX Render`
 7. `Toolhub DOCX Template Fill`
+8. `Toolhub PDF Extract Text`
+9. `Toolhub PDF Info`
+10. `Toolhub OCR Image`
+11. `Toolhub HTML to Markdown`
+12. `Toolhub Markdown to HTML`
+13. `Toolhub Document Convert`
+14. `Toolhub XLSX Read`
+15. `Toolhub Image Convert`
+16. `Toolhub GIF Optimize`
+17. `Toolhub Image Metadata`
+18. `Toolhub Audio Convert`
+19. `Toolhub JSON Transform`
+20. `Toolhub YAML Transform`
+21. `Toolhub Array Stats`
+22. `Toolhub HTTP Fetch`
+23. `Toolhub Download Aria2`
+24. `Toolhub Download Wget`
+25. `Toolhub Curl Request`
+26. `Toolhub Unzip`
+27. `Toolhub Tree List`
+28. `Toolhub BC Calc`
+29. `Toolhub Git`
 
-## Audio split behavior
+## Endpoint mapping
 
-`Toolhub Audio Split` uploads audio to `POST /n8n_audio_split` and returns one item per chunk with binary payload.
-
-- `splitMode=hard` maps to `mode=fixed`
-- `splitMode=silence` maps to `mode=silence`
-- silence splitting selects the nearest detected silence before each hard boundary
+- File-first nodes use `POST /run-file` and can optionally download the first artifact.
+- JSON-first nodes use `POST /run`.
+- Audio split upload-first uses `POST /n8n_audio_split`.
 
 ## Example workflows
 
@@ -40,3 +60,4 @@ This guide documents the public community package:
 - `docs/workflows/n8n_toolhub_community_cleanup.json`
 - `docs/workflows/n8n_toolhub_community_docx_render.json`
 - `docs/workflows/n8n_toolhub_community_ios_audio_openai_notion.json`
+- `docs/workflows/n8n_toolhub_community_*.json` for dedicated examples of each newly added node

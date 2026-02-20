@@ -48,6 +48,7 @@ RUN apt-get install -y --no-install-recommends gifsicle                      # G
 RUN apt-get install -y --no-install-recommends exiftool                      # Image metadata editing
 RUN apt-get install -y --no-install-recommends poppler-utils                 # PDF utilities (e.g. pdftotext)
 RUN apt-get install -y --no-install-recommends tesseract-ocr                 # OCR engine
+RUN apt-get install -y --no-install-recommends pandoc                        # Document conversion backend for pypandoc
 RUN apt-get install -y --no-install-recommends aria2                         # Advanced CLI downloader
 RUN apt-get install -y --no-install-recommends jq                            # JSON processor
 RUN apt-get install -y --no-install-recommends yq                            # YAML processor

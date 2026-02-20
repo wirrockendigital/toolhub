@@ -1,0 +1,40 @@
+{
+  "name": "Toolhub Tree List Example",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [260, 280]
+    },
+    {
+      "parameters": {},
+      "id": "toolhub-node",
+      "name": "Toolhub Tree List",
+      "type": "n8n-nodes-toolhub.toolhubTreeList",
+      "typeVersion": 1,
+      "position": [520, 280]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Toolhub Tree List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "1",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

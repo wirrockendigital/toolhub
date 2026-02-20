@@ -1,0 +1,15 @@
+{
+  "name": "audio_convert",
+  "description": "Convert audio media with ffmpeg.",
+  "command": "/scripts/audio-convert.py",
+  "io_mode": "file",
+  "n8n_alias": "n8n_audio_convert",
+  "output_artifacts": true,
+  "args": [
+    {"name": "input_path", "type": "string", "required": true, "style": "flag"},
+    {"name": "output_format", "type": "string", "required": false, "style": "flag"},
+    {"name": "audio_codec", "type": "string", "required": false, "style": "flag"},
+    {"name": "output_dir", "type": "string", "required": false, "style": "flag"},
+    {"name": "output_filename", "type": "string", "required": false, "style": "flag"}
+  ]
+}

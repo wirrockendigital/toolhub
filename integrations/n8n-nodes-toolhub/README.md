@@ -4,7 +4,9 @@ Community nodes for integrating Toolhub with n8n.
 
 ## What is included
 
-This package provides separate nodes per Toolhub function:
+This package provides separate nodes per Toolhub function.
+
+### Core
 
 - `Toolhub Audio Split`
 - `Toolhub Audio Split Compat`
@@ -13,6 +15,37 @@ This package provides separate nodes per Toolhub function:
 - `Toolhub WOL`
 - `Toolhub DOCX Render`
 - `Toolhub DOCX Template Fill`
+
+### Document/PDF/OCR
+
+- `Toolhub PDF Extract Text`
+- `Toolhub PDF Info`
+- `Toolhub OCR Image`
+- `Toolhub HTML to Markdown`
+- `Toolhub Markdown to HTML`
+- `Toolhub Document Convert`
+- `Toolhub XLSX Read`
+
+### Media/Image/Data
+
+- `Toolhub Image Convert`
+- `Toolhub GIF Optimize`
+- `Toolhub Image Metadata`
+- `Toolhub Audio Convert`
+- `Toolhub JSON Transform`
+- `Toolhub YAML Transform`
+- `Toolhub Array Stats`
+
+### Utility/Network/Git
+
+- `Toolhub HTTP Fetch`
+- `Toolhub Download Aria2`
+- `Toolhub Download Wget`
+- `Toolhub Curl Request`
+- `Toolhub Unzip`
+- `Toolhub Tree List`
+- `Toolhub BC Calc`
+- `Toolhub Git`
 
 ## Credential
 
@@ -40,6 +73,6 @@ npm run build
 
 ## Notes
 
-- `Toolhub Audio Split` calls `POST /n8n_audio_split`, downloads chunk binaries, and returns one item per chunk.
-- `Toolhub Audio Cleanup` calls `/run` with `tool: n8n_audio_cleanup`.
-- Existing Toolhub endpoints remain compatible for legacy workflows.
+- File-first nodes call `POST /run-file`.
+- JSON-first nodes call `POST /run`.
+- `Toolhub Audio Split` calls `POST /n8n_audio_split`.

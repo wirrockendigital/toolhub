@@ -1,0 +1,13 @@
+{
+  "name": "pdf_extract_text",
+  "description": "Extract text from PDF files via pdfminer.six.",
+  "command": "/scripts/pdf-extract-text.py",
+  "io_mode": "file",
+  "n8n_alias": "n8n_pdf_extract_text",
+  "output_artifacts": true,
+  "args": [
+    {"name": "input_path", "type": "string", "required": true, "style": "flag"},
+    {"name": "output_dir", "type": "string", "required": false, "style": "flag"},
+    {"name": "output_filename", "type": "string", "required": false, "style": "flag"}
+  ]
+}
