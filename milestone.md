@@ -75,3 +75,5 @@
 70. MCP-Server auf aktuelles SDK-Modulrouting angepasst: `StdioServerTransport` wird nun über `@modelcontextprotocol/sdk/server/stdio.js` importiert, damit `npm run mcp:dev -- --list-tools` im CI-Runtime-Check startet.
 71. Typescript-Moduldeklamation für MCP-stdio entsprechend auf `@modelcontextprotocol/sdk/server/stdio.js` synchronisiert.
 72. Versionsanhebung auf `0.2.9` für den Discovery-Runtime-Fix durchgeführt und im Changelog dokumentiert.
+73. CI-Workflow um `workflow_dispatch` erweitert, damit `Toolhub CI` manuell über GitHub CLI (`gh workflow run "Toolhub CI" --ref main`) auslösbar ist.
+74. Release-Bump auf `0.2.10` vorbereitet (VERSION, pyproject, package.json, MCP config, n8n package, CHANGELOG) als geplanter CI-Trigger-Modernisierungs-Release.

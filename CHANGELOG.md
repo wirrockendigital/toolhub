@@ -1,3 +1,10 @@
+## [0.2.10] – 2026-02-21
+### Added
+- `workflow_dispatch` trigger to `Toolhub CI`, enabling manual CI runs via `gh workflow run` without creating a dummy commit.
+
+### Changed
+- Project version metadata bumped to `0.2.10` across VERSION/package/pyproject/MCP defaults.
+
 ## [0.2.9] – 2026-02-20
 ### Fixed
 - MCP server transport import switched to `@modelcontextprotocol/sdk/server/stdio.js`, matching current SDK module layout during `--list-tools` startup.
