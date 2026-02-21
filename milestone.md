@@ -77,3 +77,4 @@
 72. Versionsanhebung auf `0.2.9` für den Discovery-Runtime-Fix durchgeführt und im Changelog dokumentiert.
 73. CI-Workflow um `workflow_dispatch` erweitert, damit `Toolhub CI` manuell über GitHub CLI (`gh workflow run "Toolhub CI" --ref main`) auslösbar ist.
 74. Release-Bump auf `0.2.10` vorbereitet (VERSION, pyproject, package.json, MCP config, n8n package, CHANGELOG) als geplanter CI-Trigger-Modernisierungs-Release.
+75. Versionsanhebung auf `0.2.11` durchgeführt (VERSION, pyproject.toml, package.json, src/mcp/config.ts, integrations/n8n-nodes-toolhub/package.json, CHANGELOG) und neuer Release-Zyklus für CI/GHCR gestartet.

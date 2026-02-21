@@ -1,3 +1,7 @@
+## [0.2.11] – 2026-02-21
+### Changed
+- Project version metadata bumped to `0.2.11` across VERSION/package/pyproject/MCP defaults.
+
 ## [0.2.10] – 2026-02-21
 ### Added
 - `workflow_dispatch` trigger to `Toolhub CI`, enabling manual CI runs via `gh workflow run` without creating a dummy commit.
